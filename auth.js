@@ -31,13 +31,83 @@ async function loadIdentity(){
 
 window.showAuth=()=>{
  const m=document.querySelector('#modal');
- m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><div class="auth-brand">🌲</div><h2>ورود به سفر</h2><p class="muted">برای استفاده از برنامه وارد حساب خود شوید.</p><div class="form"><label>ایمیل<input id="authEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="authPassword" type="password" autocomplete="current-password"></label><button class="btn" onclick="loginUser()">ورود</button><button class="btn secondary" onclick="showSignup()">ایجاد حساب جدید</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
+ m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><div class="auth-brand">🌲</div><h2>ورود به سفر</h2><p class="muted">برای استفاده از برنامه وارد حساب خود شوید.</p><div class="form"><label>ایمیل<input id="authEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="authPassword" type="password" autocomplete="current-password"></label><button class="btn" onclick="loginUser()">ورود</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button><button class="btn secondary" onclick="showSignup()">ایجاد حساب جدید</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
 };
 window.showSignup=()=>{
- const m=document.querySelector('#modal');m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><h2>ایجاد حساب</h2><div class="form"><label>نام و نام خانوادگی<input id="suName" autocomplete="name"></label><label>موبایل<input id="suPhone" autocomplete="tel"></label><label>ایمیل<input id="suEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="suPass" type="password" minlength="6"></label><button class="btn" onclick="signupUser()">ثبت‌نام</button><button class="btn secondary" onclick="showAuth()">بازگشت به ورود</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
+ const m=document.querySelector('#modal');m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><h2>ایجاد حساب</h2><div class="form"><label>نام و نام خانوادگی<input id="suName" autocomplete="name"></label><label>موبایل<input id="suPhone" autocomplete="tel"></label><label>ایمیل<input id="suEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="suPass" type="password" minlength="6"></label><button class="btn" onclick="signupUser()">ثبت‌نام</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button><button class="btn secondary" onclick="showAuth()">بازگشت به ورود</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
 };
-window.loginUser=async()=>{const msg=document.querySelector('#authMsg');msg.textContent='در حال ورود...';const {error}=await sb.auth.signInWithPassword({email:document.querySelector('#authEmail').value,password:document.querySelector('#authPassword').value});msg.textContent=error?.message||'ورود موفق بود.';if(!error){await loadIdentity();closeModal();window.refreshAppAuth?.();}};
-window.signupUser=async()=>{const name=document.querySelector('#suName').value.trim(),phone=document.querySelector('#suPhone').value.trim(),email=document.querySelector('#suEmail').value.trim(),password=document.querySelector('#suPass').value;const msg=document.querySelector('#authMsg');msg.textContent='در حال ثبت‌نام...';const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name,phone}}});if(error){msg.textContent=error.message;return;}if(data.user && data.session){await sb.from('profiles').upsert({user_id:data.user.id,display_name:name,phone}).select(); await loadIdentity(); if(savedJoinToken()) await showJoinFlow(savedJoinToken());}msg.textContent='ثبت‌نام انجام شد. اگر تأیید ایمیل فعال باشد، ایمیل خود را تأیید کنید.';};
+function authErrorText(error, action='درخواست'){
+  if(!error) return '';
+  const code=error.code||error.name||'بدون کد';
+  const status=error.status||error.statusCode||'';
+  const msg=error.message||String(error);
+  const hint=error.hint||error.details||'';
+  let help='';
+  if(msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('network')){
+    help='اتصال مرورگر به Supabase برقرار نشد. اینترنت، آدرس پروژه، کلید Publishable و تنظیمات دامنه را بررسی کنید.';
+  } else if(code==='user_already_exists' || msg.toLowerCase().includes('already registered')){
+    help='این ایمیل قبلاً ثبت شده است. از گزینه ورود استفاده کنید.';
+  } else if(code==='weak_password' || msg.toLowerCase().includes('password')){
+    help='رمز عبور را مطابق حداقل الزامات Supabase وارد کنید.';
+  } else if(code==='email_address_invalid'){
+    help='فرمت ایمیل صحیح نیست.';
+  }
+  console.error('[Supabase]', {action, code, status, message:msg, hint, error});
+  return `خطا در ${action}:\n${msg}${code?`\nکد: ${code}`:''}${status?`\nHTTP: ${status}`:''}${hint?`\nجزئیات: ${hint}`:''}${help?`\n\nراهنما: ${help}`:''}`;
+}
+
+window.testSupabaseConnection=async(show=true)=>{
+  const url=window.SUPABASE_CONFIG?.url||'';
+  const key=window.SUPABASE_CONFIG?.anonKey||'';
+  const result={ok:false,url,keyPresent:!!key,status:null,message:''};
+  try{
+    if(!url || !/^https:\/\/[^/]+\.supabase\.co$/.test(url)) throw new Error('آدرس Supabase نامعتبر است: '+url);
+    if(!key) throw new Error('کلید Publishable/anon در supabase-config.js وجود ندارد.');
+    const r=await fetch(url+'/auth/v1/settings',{method:'GET',headers:{apikey:key},cache:'no-store'});
+    result.status=r.status;
+    if(!r.ok){
+      const text=await r.text().catch(()=> '');
+      throw new Error(`Supabase پاسخ HTTP ${r.status} داد${text?' — '+text.slice(0,300):''}`);
+    }
+    result.ok=true; result.message='اتصال به Supabase برقرار است.';
+  }catch(e){result.message=e?.message||String(e);console.error('[Supabase connection test]',result,e);}
+  if(show){
+    const msg=document.querySelector('#authMsg');
+    if(msg){msg.textContent=result.ok?'✅ '+result.message:`❌ اتصال ناموفق\n${result.message}`;msg.classList.toggle('error',!result.ok);}
+  }
+  return result;
+};
+window.loginUser=async()=>{
+ const msg=document.querySelector('#authMsg');msg.classList.remove('error');msg.textContent='در حال بررسی اتصال و ورود...';
+ try{
+  const test=await window.testSupabaseConnection(false);
+  if(!test.ok){msg.textContent=`❌ اتصال به سرور برقرار نشد.\n${test.message}\n\nاگر خطا «Failed to fetch» است، دکمه «تست اتصال» را بزنید و نتیجه را ببینید.`;msg.classList.add('error');return;}
+  const email=document.querySelector('#authEmail').value.trim(),password=document.querySelector('#authPassword').value;
+  if(!email||!password){msg.textContent='ایمیل و رمز عبور را وارد کنید.';return;}
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error){msg.textContent=authErrorText(error,'ورود');msg.classList.add('error');return;}
+  msg.textContent='ورود موفق بود.'; await loadIdentity(); closeModal(); window.refreshAppAuth?.();
+ }catch(e){msg.textContent=authErrorText(e,'ورود');msg.classList.add('error');}
+};
+window.signupUser=async()=>{
+ const name=document.querySelector('#suName').value.trim(),phone=document.querySelector('#suPhone').value.trim(),email=document.querySelector('#suEmail').value.trim(),password=document.querySelector('#suPass').value;
+ const msg=document.querySelector('#authMsg');msg.classList.remove('error');msg.textContent='در حال بررسی اتصال...';
+ try{
+  const test=await window.testSupabaseConnection(false);
+  if(!test.ok){msg.textContent=`❌ اتصال به Supabase برقرار نشد.\n${test.message}\n\nاین پیام دقیقاً مشخص می‌کند مشکل از اتصال است یا ثبت‌نام.`;msg.classList.add('error');return;}
+  if(!name||!email||!password){msg.textContent='نام، ایمیل و رمز عبور را کامل کنید.';return;}
+  if(password.length<6){msg.textContent='رمز عبور باید حداقل ۶ کاراکتر باشد.';return;}
+  msg.textContent='ارتباط برقرار است؛ در حال ثبت‌نام...';
+  const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name,phone}}});
+  if(error){msg.textContent=authErrorText(error,'ثبت‌نام');msg.classList.add('error');return;}
+  if(data.user && data.session){
+    const {error:pe}=await sb.from('profiles').upsert({user_id:data.user.id,display_name:name,phone}).select();
+    if(pe){console.warn('Profile upsert warning',pe);msg.textContent=authErrorText(pe,'ثبت پروفایل');msg.classList.add('error');return;}
+    await loadIdentity(); if(savedJoinToken()) await showJoinFlow(savedJoinToken());
+  }
+  msg.textContent=data.session?'✅ ثبت‌نام با موفقیت انجام شد.':'✅ حساب ایجاد شد. ایمیل خود را برای فعال‌سازی تأیید کنید.';
+ }catch(e){msg.textContent=authErrorText(e,'ثبت‌نام');msg.classList.add('error');}
+};
 window.logoutUser=async()=>{await sb.auth.signOut();location.reload();};
 
 async function showJoinFlow(token){
