@@ -44,7 +44,7 @@ window.uploadPhoto=async()=>{
   if(up){alert('آپلود عکس انجام نشد: '+up.message);return;}
   const {error}=await window.sb.from('album_photos').insert({trip_id:window.authState.tripId,uploaded_by:window.authState.session.user.id,storage_path:path,caption:''});
   if(error){await window.sb.storage.from('trip-photos').remove([path]);alert('ثبت عکس انجام نشد: '+error.message);return;}
-  loadAlbum();
+  loadAlbum(); loadHomeAlbum();
  };
  input.click();
 };
@@ -55,40 +55,59 @@ window.togglePhotoLike=async(photoId)=>{
  if(readErr){alert(readErr.message);return;}
  if(existing){const {error}=await window.sb.from('photo_likes').delete().eq('id',existing.id);if(error){alert(error.message);return;}}
  else{const {error}=await window.sb.from('photo_likes').insert({photo_id:photoId,user_id:uid});if(error){alert(error.message);return;}}
- loadAlbum();
+ loadAlbum(); loadHomeAlbum();
 };
 window.addPhotoComment=async(photoId)=>{
  if(!window.authState?.session){showAuth();return;}
  const text=prompt('نظر شما:'); if(!text?.trim())return;
  const clean=text.trim().slice(0,1000);
  const {error}=await window.sb.from('photo_comments').insert({photo_id:photoId,user_id:window.authState.session.user.id,comment:clean});
- if(error){alert(error.message);return;} loadAlbum();
+ if(error){alert(error.message);return;} loadAlbum(); loadHomeAlbum();
+};
+async function fetchAlbumData(limit=6){
+ if(!window.authState?.tripId)return {photos:[],likes:[],comments:[],profiles:[]};
+ let q=window.sb.from('album_photos').select('id,trip_id,uploaded_by,storage_path,caption,created_at').eq('trip_id',window.authState.tripId).order('created_at',{ascending:false});
+ if(limit)q=q.limit(limit);
+ const {data:photos,error}=await q;
+ if(error)throw error;
+ const list=photos||[], ids=list.map(p=>p.id);
+ if(!ids.length)return {photos:list,likes:[],comments:[],profiles:[]};
+ const userIds=[...new Set(list.map(p=>p.uploaded_by).filter(Boolean))];
+ const [lr,cr,pr]=await Promise.all([
+  window.sb.from('photo_likes').select('id,photo_id,user_id').in('photo_id',ids),
+  window.sb.from('photo_comments').select('id,photo_id,user_id,comment,created_at').in('photo_id',ids).order('created_at',{ascending:true}),
+  userIds.length?window.sb.from('profiles').select('user_id,display_name').in('user_id',userIds):Promise.resolve({data:[],error:null})
+ ]);
+ if(lr.error)throw lr.error;if(cr.error)throw cr.error;
+ return {photos:list,likes:lr.data||[],comments:cr.data||[],profiles:pr.data||[]};
+}
+function renderPhotoCards(list,likeRows,commentRows,profileRows,compact=false){
+ const profileMap=Object.fromEntries((profileRows||[]).map(x=>[x.user_id,x.display_name]));
+ const uid=window.authState?.session?.user?.id;
+ const photoUrl=p=>window.sb.storage.from('trip-photos').getPublicUrl(p.storage_path).data.publicUrl;
+ return list.map(ph=>{
+  const phLikes=likeRows.filter(x=>x.photo_id===ph.id);
+  const allComments=commentRows.filter(x=>x.photo_id===ph.id);
+  const phComments=allComments.slice(-3);
+  const liked=phLikes.some(x=>x.user_id===uid);
+  return `<article class="photo-card ${compact?'compact':''}"><img src="${escapeAttr(photoUrl(ph))}" loading="lazy" alt="عکس سفر" onclick="openPhoto('${ph.id}')"><div class="photo-meta"><b>${escapeHtml(profileMap[ph.uploaded_by]||'عضو سفر')}</b><div class="photo-actions"><button class="icon-btn ${liked?'liked':''}" onclick="togglePhotoLike('${ph.id}')">♥ ${phLikes.length}</button><button class="icon-btn" onclick="addPhotoComment('${ph.id}')">💬 ${allComments.length}</button></div></div>${ph.caption?`<p>${escapeHtml(ph.caption)}</p>`:''}<div class="comments">${phComments.map(c=>`<div><b>${escapeHtml(profileMap[c.user_id]||'عضو')}:</b> ${escapeHtml(c.comment)}</div>`).join('')}</div></article>`;
+ }).join('');
+}
+window.loadHomeAlbum=async()=>{
+ const grid=document.querySelector('#homeAlbumGrid');if(!grid)return;
+ if(!window.authState?.session||!window.authState?.tripId){grid.innerHTML='<div class="empty-state">برای دیدن آلبوم وارد حساب شوید و عضو سفر باشید.</div>';return;}
+ try{const d=await fetchAlbumData(6);if(!d.photos.length){grid.innerHTML='<div class="empty-state">هنوز عکسی در آلبوم نیست. اولین عکس را اضافه کنید 📸</div>';return;}grid.innerHTML=renderPhotoCards(d.photos,d.likes,d.comments,d.profiles,true);}catch(e){grid.innerHTML=`<div class="empty-state">خطا در بارگذاری آلبوم.<br><small>${escapeHtml(e.message)}</small></div>`;}
+};
+window.openPhoto=async(photoId)=>{
+ if(!window.authState?.tripId)return;
+ try{const d=await fetchAlbumData(null);const ph=d.photos.find(x=>x.id===photoId);if(!ph)return;const url=window.sb.storage.from('trip-photos').getPublicUrl(ph.storage_path).data.publicUrl;const profile=Object.fromEntries((d.profiles||[]).map(x=>[x.user_id,x.display_name]));const likes=d.likes.filter(x=>x.photo_id===ph.id),comments=d.comments.filter(x=>x.photo_id===ph.id);modal().innerHTML=`<div class="lightbox" onclick="if(event.target===this)closeModal()"><div class="lightbox-card"><button class="close" onclick="closeModal()">×</button><img src="${escapeAttr(url)}" alt="عکس سفر"><div class="photo-meta"><b>${escapeHtml(profile[ph.uploaded_by]||'عضو سفر')}</b><div class="photo-actions"><button class="icon-btn" onclick="togglePhotoLike('${ph.id}')">♥ ${likes.length}</button><button class="icon-btn" onclick="addPhotoComment('${ph.id}')">💬 ${comments.length}</button></div></div>${ph.caption?`<p>${escapeHtml(ph.caption)}</p>`:''}</div></div>`;modal().classList.remove('hidden');}catch(e){alert('نمایش عکس انجام نشد: '+e.message);}
 };
 window.loadAlbum=async()=>{
- const grid=document.querySelector('#albumGrid'); if(!grid)return;
- if(!window.authState?.tripId){grid.innerHTML='<div class="empty-state">برای دیدن آلبوم ابتدا وارد حساب شوید و عضو سفر باشید.</div>';return;}
- const {data:photos,error}=await window.sb.from('album_photos').select('id,trip_id,uploaded_by,storage_path,caption,created_at').eq('trip_id',window.authState.tripId).order('created_at',{ascending:false});
- if(error){grid.innerHTML=`<div class="empty-state">خطا در بارگذاری آلبوم.<br><small>${escapeHtml(error.message)}</small></div>`;return;}
- const list=photos||[];
- if(!list.length){grid.innerHTML='<div class="empty-state">هنوز عکسی در آلبوم نیست. اولین عکس را شما اضافه کنید 📸</div>';return;}
- const ids=list.map(p=>p.id);
- const userIds=[...new Set(list.map(p=>p.uploaded_by).filter(Boolean))];
- const [{data:likes},{data:comments},{data:profiles}]=await Promise.all([
-   window.sb.from('photo_likes').select('id,photo_id,user_id').in('photo_id',ids),
-   window.sb.from('photo_comments').select('id,photo_id,user_id,comment,created_at').in('photo_id',ids).order('created_at',{ascending:true}),
-   window.sb.from('profiles').select('user_id,display_name').in('user_id',userIds)
- ]);
- const likeRows=likes||[], commentRows=comments||[], profileRows=profiles||[];
- const profileMap=Object.fromEntries(profileRows.map(x=>[x.user_id,x.display_name]));
- const photoUrl=p=>window.sb.storage.from('trip-photos').getPublicUrl(p.storage_path).data.publicUrl;
- grid.innerHTML=list.map(ph=>{
-   const phLikes=likeRows.filter(x=>x.photo_id===ph.id);
-   const phComments=commentRows.filter(x=>x.photo_id===ph.id).slice(-3);
-   const liked=phLikes.some(x=>x.user_id===window.authState.session?.user?.id);
-   return `<article class="photo-card"><img src="${escapeAttr(photoUrl(ph))}" loading="lazy" alt="عکس سفر"><div class="photo-meta"><b>${escapeHtml(profileMap[ph.uploaded_by]||'عضو سفر')}</b><div class="photo-actions"><button class="icon-btn ${liked?'liked':''}" onclick="togglePhotoLike('${ph.id}')">♥ ${phLikes.length}</button><button class="icon-btn" onclick="addPhotoComment('${ph.id}')">💬 ${commentRows.filter(x=>x.photo_id===ph.id).length}</button></div></div>${ph.caption?`<p>${escapeHtml(ph.caption)}</p>`:''}<div class="comments">${phComments.map(c=>`<div><b>${escapeHtml(profileMap[c.user_id]||'عضو')}:</b> ${escapeHtml(c.comment)}</div>`).join('')}</div></article>`;
- }).join('');
+ const grid=document.querySelector('#albumGrid');if(!grid)return;
+ if(!window.authState?.session||!window.authState?.tripId){grid.innerHTML='<div class="empty-state">برای دیدن آلبوم ابتدا وارد حساب شوید و عضو سفر باشید.</div>';return;}
+ try{const d=await fetchAlbumData(null);if(!d.photos.length){grid.innerHTML='<div class="empty-state">هنوز عکسی در آلبوم نیست. اولین عکس را شما اضافه کنید 📸</div>';return;}grid.innerHTML=renderPhotoCards(d.photos,d.likes,d.comments,d.profiles,false);}catch(e){grid.innerHTML=`<div class="empty-state">خطا در بارگذاری آلبوم.<br><small>${escapeHtml(e.message)}</small></div>`;}
 };
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function escapeAttr(v){return escapeHtml(v);}
 
-document.addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b)showPage(b.dataset.page);if(e.target===modal())closeModal()});renderPending();
+document.addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b)showPage(b.dataset.page);if(e.target===modal())closeModal()});renderPending();setTimeout(loadHomeAlbum,300);
