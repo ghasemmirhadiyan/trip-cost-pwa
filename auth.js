@@ -59,21 +59,34 @@ function authErrorText(error, action='درخواست'){
 window.testSupabaseConnection=async(show=true)=>{
   const url=window.SUPABASE_CONFIG?.url||'';
   const key=window.SUPABASE_CONFIG?.anonKey||'';
-  const result={ok:false,url,keyPresent:!!key,status:null,message:''};
+  const result={ok:false,url,keyPresent:!!key,status:null,message:'',details:[]};
+  const render=(text,ok)=>{ const msg=document.querySelector('#authMsg'); if(msg){msg.textContent=text;msg.classList.toggle('error',!ok);} };
   try{
+    result.details.push('1) بررسی تنظیمات برنامه...');
     if(!url || !/^https:\/\/[^/]+\.supabase\.co$/.test(url)) throw new Error('آدرس Supabase نامعتبر است: '+url);
     if(!key) throw new Error('کلید Publishable/anon در supabase-config.js وجود ندارد.');
-    const r=await fetch(url+'/auth/v1/settings',{method:'GET',headers:{apikey:key},cache:'no-store'});
+    result.details.push('2) ارسال درخواست به Auth API...');
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),10000);
+    let r;
+    try{ r=await fetch(url+'/auth/v1/settings',{method:'GET',headers:{apikey:key,Authorization:'Bearer '+key},cache:'no-store',signal:controller.signal}); }
+    finally{ clearTimeout(timer); }
     result.status=r.status;
-    if(!r.ok){
-      const text=await r.text().catch(()=> '');
-      throw new Error(`Supabase پاسخ HTTP ${r.status} داد${text?' — '+text.slice(0,300):''}`);
-    }
+    const text=await r.text().catch(()=> '');
+    if(!r.ok) throw new Error(`Supabase پاسخ HTTP ${r.status} داد${text?' — '+text.slice(0,500):''}`);
+    result.details.push(`3) پاسخ سرور دریافت شد (HTTP ${r.status})`);
     result.ok=true; result.message='اتصال به Supabase برقرار است.';
-  }catch(e){result.message=e?.message||String(e);console.error('[Supabase connection test]',result,e);}
+  }catch(e){
+    const msg=e?.name==='AbortError'?'زمان اتصال بیش از ۱۰ ثانیه شد.':(e?.message||String(e));
+    result.message=msg; result.details.push('❌ '+msg);
+    console.error('[Supabase connection test]',result,e);
+  }
   if(show){
-    const msg=document.querySelector('#authMsg');
-    if(msg){msg.textContent=result.ok?'✅ '+result.message:`❌ اتصال ناموفق\n${result.message}`;msg.classList.toggle('error',!result.ok);}
+    if(result.ok){
+      render('✅ اتصال به Supabase برقرار است.\n'+result.details.join('\n')+'\n\nProject: '+result.url, true);
+    }else{
+      render('❌ تست اتصال ناموفق بود\n'+result.details.join('\n')+'\n\nآدرس: '+(result.url||'تعریف نشده')+'\nکلید: '+(result.keyPresent?'وجود دارد':'وجود ندارد')+'\nHTTP: '+(result.status??'دریافت نشد')+'\n\nاگر اینجا هم Failed to fetch می‌بینی، مشکل قبل از ثبت‌نام و در ارتباط مرورگر با Supabase است.', false);
+    }
   }
   return result;
 };
