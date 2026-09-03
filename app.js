@@ -1,4 +1,4 @@
-const APP_VERSION = "12.9";
+const APP_VERSION = "13.0"
 const state={role:'admin',user:'قاسم',trip:'سفر شمال ۱۴۰۵',pendingMembers:[],members:[],expenses:[],locations:[],itinerary:[],shareAmount:12000000};
 const $=s=>document.querySelector(s); let modal=()=>document.querySelector('#modal');
 const money=n=>new Intl.NumberFormat('fa-IR').format(Number(n)||0)+' تومان';
@@ -200,26 +200,32 @@ window.newExpense=async()=>{
 window.togglePayerField=()=>{const w=document.querySelector('#payerWrap');const f=document.querySelector('#exFromFund');w?.classList.toggle('hidden',f?.value==='true');};
 window.editExpense=async(id)=>{
  if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند هزینه را ویرایش کند.');
- const e=state.expenses.find(x=>x.id===id); if(!e)return alert('هزینه پیدا نشد.');
- try{await loadTripMembers();}catch(err){return alert('اعضای سفر بارگذاری نشد: '+err.message);}
- const {data:parts,error:perr}=await window.sb.from('expense_participants').select('trip_member_id').eq('expense_id',id);
- if(perr)return alert('افراد مشمول هزینه بارگذاری نشد: '+perr.message);
- const selected=new Set((parts||[]).map(x=>Number(x.trip_member_id)));
- const opts=state.members.map(m=>`<label class="check-row"><input type="checkbox" name="eep" value="${m.id}" ${selected.has(Number(m.id))?'checked':''}><span>${escapeHtml(m.name)}</span></label>`).join('');
- const payers=state.members.map(m=>`<option value="${m.id}" ${Number(e.payer_member_id)===Number(m.id)?'selected':''}>${escapeHtml(m.name)}</option>`).join('');
- modal().innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>✏️ ویرایش هزینه</h2><p class="muted">مدیر می‌تواند تمام جزئیات هزینه، پرداخت‌کننده و اعضای مشمول را اصلاح کند. وضعیت فعلی هزینه حفظ می‌شود.</p><div class="form"><label>عنوان هزینه<input id="exTitle" value="${escapeAttr(e.title||'')}"></label><label>مبلغ (تومان)<input id="exAmount" type="number" min="1" inputmode="numeric" value="${Number(e.amount||0)}"></label><label>تاریخ<input id="exDate" type="date" value="${e.expense_date||''}"></label><label>دسته‌بندی<select id="exCat"><option value="food">غذا</option><option value="accommodation">اقامت</option><option value="transport">حمل‌ونقل</option><option value="fuel">سوخت</option><option value="shopping">خرید</option><option value="entertainment">تفریح</option><option value="sightseeing">گردش</option><option value="medical">پزشکی</option><option value="other">سایر</option></select></label><label>نحوه پرداخت<select id="exFromFund" onchange="togglePayerField()"><option value="true" ${e.from_fund?'selected':''}>از صندوق مشترک</option><option value="false" ${!e.from_fund?'selected':''}>پرداخت شخصی</option></select></label><label id="payerWrap" class="${e.from_fund?'hidden':''}">پرداخت‌کننده<select id="exPayer">${payers}</select></label><label>توضیحات<textarea id="exNote">${escapeHtml(e.note||'')}</textarea></label><div><b>اعضای مشمول هزینه</b><p class="muted">اعضای انتخاب‌شده مبنای محاسبه سهم این هزینه هستند.</p>${opts}</div><button class="btn" onclick="saveEditedExpense('${e.id}')">💾 ذخیره تغییرات</button></div></div>`;
- const cat=document.querySelector('#exCat');if(cat)cat.value=e.category||'other'; modal().classList.remove('hidden');
+ try{
+  const [{data:e,error:ee},{data:parts,error:pe}]=await Promise.all([window.sb.from('expenses').select('id,trip_id,expense_date,title,category,amount,from_fund,payer_member_id,status,note').eq('id',id).eq('trip_id',window.authState.tripId).maybeSingle(),window.sb.from('expense_participants').select('trip_member_id').eq('expense_id',id)]);
+  if(ee)throw ee; if(pe)throw pe; if(!e)throw new Error('هزینه پیدا نشد.');
+  await loadTripMembers();
+  const selected=new Set((parts||[]).map(x=>String(x.trip_member_id)));
+  const opts=state.members.map(m=>`<label class="check-row"><input type="checkbox" name="eep" value="${m.id}" ${selected.has(String(m.id))?'checked':''}><span>${escapeHtml(m.name)}</span></label>`).join('');
+  const payers=state.members.map(m=>`<option value="${m.id}" ${Number(e.payer_member_id)===Number(m.id)?'selected':''}>${escapeHtml(m.name)}</option>`).join('');
+  modal().innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>✏️ ویرایش هزینه</h2><p class="muted">مدیر می‌تواند تمام جزئیات هزینه، پرداخت‌کننده و اعضای مشمول را اصلاح کند. وضعیت فعلی هزینه حفظ می‌شود.</p><div class="form"><label>عنوان هزینه<input id="exTitle" value="${escapeAttr(e.title||'')}"></label><label>مبلغ (تومان)<input id="exAmount" type="number" min="1" inputmode="numeric" value="${Number(e.amount||0)}"></label><label>تاریخ<input id="exDate" type="date" value="${e.expense_date||''}"></label><label>دسته‌بندی<select id="exCat"><option value="food">غذا</option><option value="accommodation">اقامت</option><option value="transport">حمل‌ونقل</option><option value="fuel">سوخت</option><option value="shopping">خرید</option><option value="entertainment">تفریح</option><option value="sightseeing">گردش</option><option value="medical">پزشکی</option><option value="other">سایر</option></select></label><label>نحوه پرداخت<select id="exFromFund"><option value="true">از صندوق مشترک</option><option value="false">پرداخت شخصی</option></select></label><label id="payerWrap">پرداخت‌کننده<select id="exPayer">${payers}</select></label><label>توضیحات<textarea id="exNote">${escapeHtml(e.note||'')}</textarea></label><div><b>اعضای مشمول هزینه</b><p class="muted">اعضای انتخاب‌شده مبنای محاسبه سهم این هزینه هستند.</p>${opts}</div><button class="btn" id="saveEditedExpenseBtn" type="button">💾 ذخیره تغییرات</button></div></div>`;
+  const cat=document.querySelector('#exCat');if(cat)cat.value=e.category||'other';
+  const ff=document.querySelector('#exFromFund');if(ff){ff.value=e.from_fund?'true':'false';ff.onchange=togglePayerField;}
+  const btn=document.querySelector('#saveEditedExpenseBtn');if(btn)btn.onclick=()=>saveEditedExpense(id);
+  togglePayerField();modal().classList.remove('hidden');
+ }catch(err){console.error('editExpense',err);alert('اطلاعات هزینه برای ویرایش بارگذاری نشد:\n'+(err?.message||err));}
 };
 window.saveEditedExpense=async(id)=>{
  if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند هزینه را ویرایش کند.');
- const title=$('#exTitle')?.value.trim(),amount=Number($('#exAmount')?.value),date=$('#exDate')?.value||new Date().toISOString().slice(0,10),category=$('#exCat')?.value||'other',fromFund=$('#exFromFund')?.value==='true',payer=Number($('#exPayer')?.value||0)||null,note=$('#exNote')?.value.trim()||null,participants=[...document.querySelectorAll('input[name=eep]:checked')].map(x=>Number(x.value));
- if(!title||!amount||amount<=0)return alert('عنوان و مبلغ را کامل وارد کنید.');
+ const title=$('#exTitle')?.value.trim(),amount=Number($('#exAmount')?.value),date=$('#exDate')?.value,category=$('#exCat')?.value||'other',fromFund=$('#exFromFund')?.value==='true',payer=Number($('#exPayer')?.value||0)||null,note=$('#exNote')?.value.trim()||null,participants=[...document.querySelectorAll('input[name=eep]:checked')].map(x=>Number(x.value));
+ if(!title||!Number.isFinite(amount)||amount<=0)return alert('عنوان و مبلغ را کامل و صحیح وارد کنید.');
+ if(!date)return alert('تاریخ هزینه را وارد کنید.');
  if(!participants.length)return alert('حداقل یک عضو باید در هزینه سهیم باشد.');
  if(!fromFund&&!payer)return alert('پرداخت‌کننده را انتخاب کنید.');
+ if(new Set(participants).size!==participants.length)return alert('اعضای مشمول تکراری هستند.');
  if(!confirm('تغییرات این هزینه ذخیره شود؟'))return;
- const {error}=await window.sb.rpc('update_expense_admin',{p_expense_id:id,p_expense_date:date,p_title:title,p_category:category,p_amount:Math.round(amount),p_from_fund:fromFund,p_payer_member_id:fromFund?null:payer,p_note:note,p_participants:participants});
- if(error){alert('ویرایش هزینه انجام نشد: '+error.message);return;}
- alert('هزینه با موفقیت ویرایش شد.');closeModal();await loadExpenses();await showPage('expenses');
+ const btn=document.querySelector('#saveEditedExpenseBtn');if(btn){btn.disabled=true;btn.textContent='در حال ذخیره...';}
+ try{const {error}=await window.sb.rpc('update_expense_admin',{p_expense_id:id,p_expense_date:date,p_title:title,p_category:category,p_amount:Math.round(amount),p_from_fund:fromFund,p_payer_member_id:fromFund?null:payer,p_note:note,p_participants:participants});if(error)throw error;closeModal();await loadExpenses();await showPage('expenses');alert('هزینه با موفقیت ویرایش شد.');}
+ catch(err){console.error('saveEditedExpense',err);if(btn){btn.disabled=false;btn.textContent='💾 ذخیره تغییرات';}alert('ویرایش هزینه انجام نشد:\n'+(err?.message||err));}
 };
 window.saveExpense=async()=>{const title=$('#exTitle')?.value.trim(),amount=Number($('#exAmount')?.value),date=$('#exDate')?.value||new Date().toISOString().slice(0,10),category=$('#exCat')?.value||'other',fromFund=$('#exFromFund')?.value==='true',payer=Number($('#exPayer')?.value||0)||null,note=$('#exNote')?.value.trim()||null,participants=[...document.querySelectorAll('input[name=ep]:checked')].map(x=>Number(x.value));if(!title||!amount||amount<=0){alert('عنوان و مبلغ را کامل وارد کنید.');return;}if(!participants.length){alert('حداقل یک عضو باید در هزینه سهیم باشد.');return;}if(!fromFund&&!payer){alert('پرداخت‌کننده را انتخاب کنید.');return;}const uid=window.authState.session.user.id;const payload={trip_id:window.authState.tripId,expense_date:date,title,category,amount,from_fund:fromFund,payer_member_id:fromFund?null:payer,note,submitted_by:uid,status:'pending'};const {data:expense,error}=await window.sb.from('expenses').insert(payload).select('id').single();if(error){alert('ثبت هزینه انجام نشد: '+error.message);return;}const rows=participants.map(trip_member_id=>({expense_id:expense.id,trip_member_id}));const {error:perr}=await window.sb.from('expense_participants').insert(rows);if(perr){await window.sb.from('expenses').delete().eq('id',expense.id);alert('ثبت افراد مشمول انجام نشد: '+perr.message);return;}alert('هزینه ثبت شد و در انتظار تأیید مدیر است.');closeModal();await loadExpenses();showPage('expenses');};
 window.editShareAmount=async()=>{
