@@ -2,7 +2,7 @@ const { createClient } = window.supabase;
 const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 window.sb = sb;
 
-const authState = { session: null, profile: null, tripId: null, trip: null, member: null };
+const authState = { session: null, profile: null, tripId: null, trip: null, member: null, trips: [] };
 const savedJoinToken = () => localStorage.getItem('trip_join_token');
 function rememberJoinToken(){ const t=new URLSearchParams(location.search).get('join'); if(t) localStorage.setItem('trip_join_token',t); }
 const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -25,10 +25,26 @@ async function loadIdentity(){
   authState.profile=p;
   const inviteToken=savedJoinToken();
   if(inviteToken) await showJoinFlow(inviteToken);
-  const {data:ms}=await sb.from('trip_members').select('*, trips(*)').eq('user_id',u.id).order('created_at',{ascending:false}).limit(1);
-  if(ms?.[0]){authState.member=ms[0];authState.tripId=ms[0].trip_id;authState.trip=ms[0].trips;}
+  const {data:ms,error:me}=await sb.from('trip_members').select('*, trips(*)').eq('user_id',u.id).eq('active',true).order('created_at',{ascending:false});
+  if(me) console.error('load user trips',me);
+  authState.trips=(ms||[]).map(x=>({member:x,trip:x.trips})).filter(x=>x.trip);
+  const savedTrip=localStorage.getItem('selected_trip_id');
+  const chosen=authState.trips.find(x=>x.trip.id===savedTrip)||authState.trips[0];
+  if(chosen){authState.member=chosen.member;authState.tripId=chosen.trip.id;authState.trip=chosen.trip;localStorage.setItem('selected_trip_id',chosen.trip.id);} 
+  else {authState.member=null;authState.tripId=null;authState.trip=null;}
 }
 
+window.selectTrip=async(tripId)=>{
+ const found=(window.authState?.trips||[]).find(x=>x.trip?.id===tripId);
+ if(!found){alert('این سفر برای حساب شما قابل انتخاب نیست.');return;}
+ window.authState.member=found.member; window.authState.tripId=found.trip.id; window.authState.trip=found.trip; localStorage.setItem('selected_trip_id',tripId);
+ closeModal(); location.reload();
+};
+window.showTrips=()=>{
+ if(!window.authState?.session){showAuth();return;}
+ const rows=window.authState.trips||[]; const m=document.querySelector('#modal');
+ m.innerHTML=`<div class=\"sheet\"><button class=\"close\" onclick=\"closeModal()\">×</button><h2>🧳 سفرهای من</h2><p class=\"muted\">یک سفر را انتخاب کنید یا یک سفر جدید بسازید.</p>${rows.map(x=>`<button class=\"list-item trip-choice\" onclick=\"selectTrip('\${x.trip.id}\')\"><b>${esc(x.trip.title)}</b><p>${esc(x.trip.destination||'بدون مقصد')} • ${x.trip.start_date||''}${x.trip.end_date?' تا '+x.trip.end_date:''}</p><small>${x.member.role==='admin'?'👑 مدیر سفر':'👤 عضو سفر'}${x.trip.id===window.authState.tripId?' • فعال':''}</small></button>`).join('')||'<div class=\"empty-state\">هنوز عضو هیچ سفری نیستید.</div>'}<button class=\"btn\" onclick=\"newTrip()\">➕ ایجاد سفر جدید</button>${!rows.length?'<p class=\"muted\">اگر دعوت‌نامه دارید، لینک دعوت را باز کنید تا درخواست عضویت ارسال شود.</p>':''}</div>`;m.classList.remove('hidden');
+};
 window.showAuth=()=>{
  const m=document.querySelector('#modal');
  m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><div class="auth-brand">🌲</div><h2>ورود به سفر</h2><p class="muted">برای استفاده از برنامه وارد حساب خود شوید.</p><div class="form"><label>ایمیل<input id="authEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="authPassword" type="password" autocomplete="current-password"></label><button class="btn" onclick="loginUser()">ورود</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button><button class="btn secondary" onclick="showSignup()">ایجاد حساب جدید</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
