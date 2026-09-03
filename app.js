@@ -1,4 +1,4 @@
-const APP_VERSION = "14.3"
+const APP_VERSION = "14.2"
 const state={role:'admin',user:'قاسم',trip:'سفر شمال ۱۴۰۵',pendingMembers:[],members:[],expenses:[],locations:[],itinerary:[],shareAmount:12000000,settlementEnabled:false};
 const $=s=>document.querySelector(s); let modal=()=>document.querySelector('#modal');
 
@@ -75,31 +75,6 @@ function renderPending(){
  if(el)el.innerHTML=pending.slice(0,3).map(x=>`<article class="pending-card"><span>🟡</span><div class="grow"><b>${escapeHtml(x.title)}</b><small>${x.from_fund?'پرداخت از صندوق':'پرداخت شخصی'} • امروز</small></div><span class="amount">${money(x.amount)}</span></article>`).join('')||'<div class="empty-state">هزینه در انتظار تأیید وجود ندارد.</div>';
  const pc=document.querySelector('#pendingCount'); if(pc)pc.textContent=pending.length;
 }
-window.refreshAdminNotifications=async function refreshAdminNotifications(){
-  if(window.authState?.member?.role!=='admin') return;
-  const el=document.querySelector('#adminNotifications'); if(!el) return;
-  const tripId=window.authState.tripId; if(!tripId) return;
-  try{
-    const [mr,ex,fc,lo,it]=await Promise.all([
-      window.sb.from('membership_requests').select('id',{count:'exact',head:true}).eq('trip_id',tripId).eq('status','pending'),
-      window.sb.from('expenses').select('id',{count:'exact',head:true}).eq('trip_id',tripId).eq('status','pending'),
-      window.sb.from('fund_contributions').select('id',{count:'exact',head:true}).eq('trip_id',tripId).eq('status','pending'),
-      window.sb.from('locations').select('id',{count:'exact',head:true}).eq('trip_id',tripId).eq('status','pending'),
-      window.sb.from('itinerary_items').select('id',{count:'exact',head:true}).eq('trip_id',tripId).eq('status','pending')
-    ]);
-    const items=[
-      {n:mr.count||0,icon:'👤',title:'درخواست عضویت جدید',page:'members',desc:'نیاز به بررسی و تأیید مدیر دارد.'},
-      {n:ex.count||0,icon:'💰',title:'هزینه جدید',page:'pending',desc:'در انتظار تأیید مدیر است.'},
-      {n:fc.count||0,icon:'🏦',title:'واریزی جدید صندوق',page:'fund',desc:'در انتظار تأیید مدیر است.'},
-      {n:lo.count||0,icon:'📍',title:'پیشنهاد مکان جدید',page:'locations',desc:'در انتظار تأیید مدیر است.'},
-      {n:it.count||0,icon:'🗺️',title:'پیشنهاد برنامه سفر',page:'itinerary',desc:'در انتظار تأیید مدیر است.'}
-    ];
-    const total=items.reduce((a,x)=>a+x.n,0);
-    if(!total){el.innerHTML='<div class="admin-notice-empty">✅ درخواست تأیید نشده‌ای وجود ندارد.<small>در صورت ثبت درخواست جدید، این بخش به‌روزرسانی می‌شود.</small></div>';return;}
-    el.innerHTML=`<div class="admin-notice-head"><div><b>🔔 درخواست‌های جدید</b><small>${total} مورد نیازمند بررسی شماست.</small></div><span class="admin-notice-count">${total}</span></div>${items.filter(x=>x.n>0).map(x=>`<button class="admin-request-card" onclick="showPage('${x.page}')"><span class="admin-request-icon">${x.icon}</span><span class="grow"><b>${x.title}</b><small>${x.n} مورد • ${x.desc}</small></span><span class="admin-request-count">${x.n}</span><span>›</span></button>`).join('')}<div class="admin-notice-refresh">آخرین بررسی: ${new Date().toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'})}</div>`;
-  }catch(e){console.error('admin notifications',e);el.innerHTML='<div class="admin-notice-empty">⚠️ بررسی درخواست‌های جدید انجام نشد.<small>لطفاً اتصال اینترنت را بررسی کنید.</small></div>';}
-};
-
 window.showPage=async function showPage(page){let title='',body='';
  if(page==='home'){ location.reload(); return; }
  if(page==='expenses'||page==='pending'||page==='approved'||page==='rejected'){title=page==='pending'?'🟡 هزینه‌های در انتظار تأیید':page==='approved'?'🟢 هزینه‌های تأیید شده':page==='rejected'?'🔴 هزینه‌های رد شده':'💰 هزینه‌ها'; const arr=page==='pending'?state.expenses.filter(e=>e.status==='pending'):page==='approved'?state.expenses.filter(e=>e.status==='approved'):page==='rejected'?state.expenses.filter(e=>e.status==='rejected'):state.expenses; body=`<div class="filter-row"><button class="chip ${page==='expenses'?'active':''}" onclick="showPage('expenses')">همه</button><button class="chip ${page==='pending'?'active':''}" onclick="showPage('pending')">🟡 در انتظار</button><button class="chip ${page==='approved'?'active':''}" onclick="showPage('approved')">🟢 تأیید شده</button><button class="chip ${page==='rejected'?'active':''}" onclick="showPage('rejected')">🔴 رد شده</button></div>${arr.map(e=>{const payer=state.members.find(m=>m.id===e.payer_member_id);return `<div class="list-item"><span class="badge ${e.status==='pending'?'pending':e.status==='approved'?'approved':'danger'}">${statusFa(e.status)}</span><b>${escapeHtml(e.title)}</b><p>${e.from_fund?'🏦 صندوق':escapeHtml(payer?.name||'پرداخت‌کننده')} • ${money(e.amount)}</p><small>تاریخ: ${e.expense_date||''}</small>${window.authState?.member?.role==='admin'?`<div class="actions"><button class="btn small" onclick="editExpense('${e.id}')">✏️ ویرایش</button>${e.status==='pending'?`<button class="btn small" onclick="approveExpense('${e.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectExpense('${e.id}')">× رد</button>`:''}</div>`:''}</div>`}).join('')||'<div class="empty-state">موردی برای نمایش وجود ندارد.</div>'}<button class="btn" onclick="newExpense()">➕ ثبت هزینه جدید</button>`; setTimeout(loadTripMembers,0); setTimeout(loadExpenses,0);
@@ -111,7 +86,7 @@ window.showPage=async function showPage(page){let title='',body='';
  } else if(page==='album'){title='📷 آلبوم سفر';body=`<div class="album-toolbar"><p class="muted">اعضای فعال سفر می‌توانند عکس اضافه کنند، لایک کنند و نظر بگذارند.</p><button class="btn" onclick="uploadPhoto()">📤 آپلود عکس</button></div><div id="albumGrid" class="album-grid"><div class="empty-state">در حال بارگذاری آلبوم...</div></div>`; setTimeout(loadAlbum,0);
  } else if(page==='about'){title='ℹ️ درباره برنامه';body=`<div class="about-card"><div class="about-logo">🌲</div><div class="about-kicker">سفر شمال ۱۴۰۵</div><h3>همه‌چیز برای یک سفر خانوادگی بهتر</h3><p>این برنامه برای مدیریت ساده و شفاف هزینه‌ها، صندوق سفر، اعضا، مکان‌های پیشنهادی، برنامه سفر و خاطرات تصویری طراحی شده است تا همه اعضای خانواده اطلاعات سفر را یکجا ببینند و هماهنگ باشند.</p><div class="about-features"><span>💰 مدیریت هزینه</span><span>🏦 صندوق مشترک</span><span>🗺️ برنامه سفر</span><span>📷 آلبوم خاطرات</span></div><div class="creator-card"><div class="creator-avatar">ق</div><div><small>سازنده و مدیر برنامه</small><strong>قاسم میرهادیان</strong><p>طراحی و توسعه با هدف ساده‌تر شدن مدیریت سفرهای خانوادگی</p></div></div><div class="about-footer">با آرزوی سفری شاد، آرام و پر از خاطرات خوب ❤️</div></div>`;
  } else if(page==='profile'){title='👤 پروفایل';const u=window.authState?.profile, m=window.authState?.member;body=`<div class="profile-card"><div class="profile-avatar">${u?.avatar_url?`<img src="${escapeAttr(u.avatar_url)}" alt="پروفایل">`:(escapeHtml((u?.display_name||state.user||'ق').slice(0,1)))}</div><button class="btn small" onclick="uploadProfilePhoto()">📷 ${u?.avatar_url?'تغییر عکس پروفایل':'افزودن عکس پروفایل'}</button><h3>${u?.display_name||state.user||'کاربر'}</h3><p>${u?.phone||'شماره موبایل ثبت نشده'}</p><p>${window.authState?.session?.user?.email||'ایمیل ثبت نشده'}</p><span class="badge ${m?.role==='admin'?'approved':'pending'}">${m?.role==='admin'?'👑 مدیر سفر':'👤 عضو سفر'}</span></div><div class="list-item"><b>🧳 سفر فعال</b><p>${window.authState?.trip?.title||state.trip}</p></div>${m?.role==='admin'?'<button class="btn" onclick="showPage(\'admin\')">👑 پنل مدیریت</button>':''}${window.authState?.session?'<button class="btn danger" onclick="logoutUser()">خروج از حساب</button>':'<button class="btn" onclick="showAuth()">ورود / ایجاد حساب</button>'}`;
-} else if(page==='admin'){title='👑 پنل مدیریت';body=`<div id="adminNotifications" class="admin-notifications"><div class="empty-state">در حال بررسی درخواست‌های جدید...</div></div><div class="admin-grid"><button onclick="showPage('members')">👥<b>اعضا</b><small>مدیریت اعضا</small></button><button onclick="showPage('pending')">🟡<b>تأیید هزینه‌ها</b><small>بررسی هزینه‌های جدید</small></button><button onclick="showPage('fund')">🏦<b>تأیید واریزی‌ها</b><small>بررسی درخواست‌های صندوق</small></button><button onclick="showPage('locations')">📍<b>تأیید مکان‌ها</b><small>بررسی پیشنهادهای جدید</small></button><button onclick="showPage('itinerary')">🗺️<b>تأیید برنامه سفر</b><small>بررسی برنامه‌های پیشنهادی</small></button><button>📊<b>گزارش‌ها</b><small>Excel / PDF</small></button></div>`;setTimeout(refreshAdminNotifications,0);
+} else if(page==='admin'){title='👑 پنل مدیریت';body=`<div class="admin-grid"><button onclick="showPage('members')">👥<b>اعضا</b><small>مدیریت اعضا</small></button><button onclick="showPage('pending')">🟡<b>تأیید هزینه‌ها</b><small>بررسی هزینه‌های جدید</small></button><button>📊<b>گزارش‌ها</b><small>Excel / PDF</small></button></div>`;
  } else {title='☰ امکانات بیشتر';body=`<div class="list-item install-menu-item" onclick="installPWA()"><b>📲 نصب برنامه روی اندروید</b><p>نصب مستقیم روی صفحه اصلی موبایل</p></div>`+['📷 آلبوم عکس','🎒 چک‌لیست سفر','🔔 اعلان‌ها','📊 گزارش‌ها و نمودارها','⚙️ تنظیمات'].map(x=>`<div class="list-item" ${x.startsWith('📷')?'onclick="showPage(\'album\')"':''}><b>${x}</b></div>`).join('')+`<div class="list-item about-menu-item" onclick="showPage('about')"><b>ℹ️ درباره برنامه</b><p>معرفی برنامه و سازنده</p></div>`+(state.role==='admin'?`<div class="list-item" onclick="showPage('admin')"><b>👑 پنل مدیریت</b><p>مدیریت اعضا، تأییدها و سفرها</p></div>`:'');}
  const target=document.querySelector('#app'); if(target){target.innerHTML=`<button class="back-home" onclick="showPage('home')">← بازگشت به داشبورد</button><section class="page-panel"><h2>${title}</h2>${body}</section>`; window.scrollTo({top:0,behavior:'smooth'}); } }
 window.closeModal=function closeModal(){modal().classList.add('hidden')}
@@ -423,7 +398,7 @@ document.addEventListener('click',e=>{
  if(action==='save-location'){e.preventDefault();window.saveLocation?.();return;}
  const b=e.target.closest('[data-page]');if(b){e.preventDefault();showPage(b.dataset.page);return;}
  if(e.target===modal())closeModal();
-});renderPending();setTimeout(loadExpenses,500);setTimeout(loadHomeAlbum,800);setInterval(()=>{if(window.authState?.member?.role==='admin'&&document.querySelector('#adminNotifications')) refreshAdminNotifications();},30000);
+});renderPending();setTimeout(loadExpenses,500);setTimeout(loadHomeAlbum,800);
 
 
 
