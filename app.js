@@ -1,4 +1,4 @@
-const APP_VERSION = "13.1"
+const APP_VERSION = "13.2"
 const state={role:'admin',user:'قاسم',trip:'سفر شمال ۱۴۰۵',pendingMembers:[],members:[],expenses:[],locations:[],itinerary:[],shareAmount:12000000};
 const $=s=>document.querySelector(s); let modal=()=>document.querySelector('#modal');
 const money=n=>new Intl.NumberFormat('fa-IR').format(Number(n)||0)+' تومان';
