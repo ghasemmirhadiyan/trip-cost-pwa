@@ -125,9 +125,13 @@ window.editMember=async(id)=>{
 window.saveMemberProfile=async(id,isSelf)=>{
  const name=$('#emName')?.value.trim(),phone=$('#emPhone')?.value.trim()||null,weight=Number($('#emWeight')?.value||0),role=isSelf?'admin':($('#emRole')?.value||'member');
  if(!name||!weight||weight<=0)return alert('نام و تعداد سهم را کامل وارد کنید.');
- const {error}=await window.sb.rpc('update_trip_member_profile',{p_member_id:Number(id),p_name:name,p_phone:phone,p_share_weight:weight,p_role:role});
- if(error){alert('ویرایش پروفایل انجام نشد: '+error.message);return;}
- alert('پروفایل عضو با موفقیت به‌روزرسانی شد.'); closeModal(); await showPage('members');
+ const btn=document.querySelector('[onclick*=\"saveMemberProfile(\']')||document.querySelector('.sheet .btn');
+ if(btn)btn.disabled=true;
+ try{
+  const {error}=await window.sb.rpc('update_trip_member_profile',{p_member_id:Number(id),p_name:name,p_phone:phone,p_share_weight:weight,p_role:role});
+  if(error){console.error('update_trip_member_profile',error);alert('ویرایش پروفایل انجام نشد:\n'+(error.message||error.details||'خطای نامشخص')+'\n\nاگر این خطا را می‌بینی، SQL نسخه 12.7 را در Supabase اجرا کن.');return;}
+  alert('پروفایل عضو با موفقیت به‌روزرسانی شد.'); closeModal(); await loadTripMembers(); await showPage('members');
+ }finally{if(btn)btn.disabled=false;}
 };
 window.deleteMember=async(id,name)=>{
  if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند عضو حذف کند.');
