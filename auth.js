@@ -1,3 +1,4 @@
+const APP_VERSION = "11.0";
 const { createClient } = window.supabase;
 const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 window.sb = sb;
