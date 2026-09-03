@@ -1,4 +1,4 @@
-const APP_VERSION = "11.5";
+const APP_VERSION = "11.6";
 const state={role:'admin',user:'قاسم',trip:'سفر شمال ۱۴۰۵',pendingMembers:[],members:[],expenses:[]};
 const $=s=>document.querySelector(s); let modal=()=>document.querySelector('#modal');
 const money=n=>new Intl.NumberFormat('fa-IR').format(Number(n)||0)+' تومان';
@@ -35,7 +35,7 @@ window.showPage=async function showPage(page){let title='',body='';
  if(page==='home'){ location.reload(); return; }
  if(page==='expenses'||page==='pending'||page==='approved'||page==='rejected'){title=page==='pending'?'🟡 هزینه‌های در انتظار تأیید':page==='approved'?'🟢 هزینه‌های تأیید شده':page==='rejected'?'🔴 هزینه‌های رد شده':'💰 هزینه‌ها'; const arr=page==='pending'?state.expenses.filter(e=>e.status==='pending'):page==='approved'?state.expenses.filter(e=>e.status==='approved'):page==='rejected'?state.expenses.filter(e=>e.status==='rejected'):state.expenses; body=`<div class="filter-row"><button class="chip ${page==='expenses'?'active':''}" onclick="showPage('expenses')">همه</button><button class="chip ${page==='pending'?'active':''}" onclick="showPage('pending')">🟡 در انتظار</button><button class="chip ${page==='approved'?'active':''}" onclick="showPage('approved')">🟢 تأیید شده</button><button class="chip ${page==='rejected'?'active':''}" onclick="showPage('rejected')">🔴 رد شده</button></div>${arr.map(e=>{const payer=state.members.find(m=>m.id===e.payer_member_id);return `<div class="list-item"><span class="badge ${e.status==='pending'?'pending':e.status==='approved'?'approved':'danger'}">${statusFa(e.status)}</span><b>${escapeHtml(e.title)}</b><p>${e.from_fund?'🏦 صندوق':escapeHtml(payer?.name||'پرداخت‌کننده')} • ${money(e.amount)}</p><small>تاریخ: ${e.expense_date||''}</small>${window.authState?.member?.role==='admin'&&e.status==='pending'?`<div class="actions"><button class="btn small" onclick="approveExpense('${e.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectExpense('${e.id}')">× رد</button></div>`:''}</div>`}).join('')||'<div class="empty-state">موردی برای نمایش وجود ندارد.</div>'}<button class="btn" onclick="newExpense()">➕ ثبت هزینه جدید</button>`; setTimeout(loadTripMembers,0); setTimeout(loadExpenses,0);
  } else if(page==='fund'){title='🏦 صندوق';body=`<div class="stat primary"><span>موجودی فعلی صندوق</span><strong>۵۸,۵۰۰,۰۰۰</strong><small>تومان</small></div><div class="stat" style="margin-top:10px"><span>📥 مطالبات صندوق</span><strong>۵,۰۰۰,۰۰۰</strong><small>تومان</small></div><button class="btn" onclick="newContribution()">➕ ثبت واریزی به صندوق</button><div class="list-item"><b>تراکنش‌های اخیر</b><p>➕ واریزی تأییدشده محمد — ۱۲,۰۰۰,۰۰۰</p><p>➖ خرید گوشت از صندوق — ۳۰,۰۰۰,۰۰۰</p></div>`;
- } else if(page==='members'){title='👥 اعضای سفر';body=`<button class="btn" onclick="addMember()">➕ افزودن عضو توسط ادمین</button><div class="list-item"><b>🔗 لینک دعوت اعضا</b><p>این لینک را برای اعضای جدید ارسال کنید.</p><button class="btn secondary" onclick="copyInvite()">کپی لینک دعوت</button></div><h3>درخواست‌های عضویت</h3>${state.pendingMembers.map((m,i)=>`<div class="list-item"><span class="badge pending">در انتظار</span><b>${m.name}</b><p>${m.phone} • ${m.date}</p><div class="actions"><button class="btn small" onclick="approveMember(${i})">✓ بررسی و تأیید</button><button class="btn danger small" onclick="rejectMember(${i})">× رد</button></div></div>`).join('')||'<p class="muted">درخواستی وجود ندارد.</p>'}<h3>اعضای فعال</h3>${state.members.map(m=>`<div class="list-item"><b>${m[0]}</b><p>ضریب مشارکت: ${m[1]} • سهم صندوق: ${money(m[2])}</p></div>`).join('')}`;
+ } else if(page==='members'){await loadTripMembers();await loadMembershipRequests();title='👥 اعضای سفر';body=`<button class="btn" onclick="addMember()">➕ افزودن عضو توسط ادمین</button><div class="list-item"><b>🔗 لینک دعوت اعضا</b><p>این لینک را برای اعضای جدید ارسال کنید.</p><button class="btn secondary" onclick="copyInvite()">کپی لینک دعوت</button></div><h3>درخواست‌های عضویت</h3>${state.pendingMembers.map((m)=>`<div class="list-item"><span class="badge pending">در انتظار</span><b>${escapeHtml(m.full_name||'کاربر')}</b><p>${escapeHtml(m.phone||'')} • ${m.requested_at?new Date(m.requested_at).toLocaleDateString('fa-IR'):''}</p><div class="actions"><button class="btn small" onclick="approveMember('${m.id}')">✓ بررسی و تأیید</button><button class="btn danger small" onclick="rejectMember('${m.id}')">× رد</button></div></div>`).join('')||'<p class="muted">درخواستی وجود ندارد.</p>'}<h3>اعضای فعال</h3>${state.members.map(m=>`<div class="list-item"><b>${escapeHtml(m.name)}</b><p>ضریب مشارکت: ${m.share_weight} • سهم صندوق: ${money(m.contribution_target)}</p><small>${m.role==='admin'?'👑 مدیر سفر':'👤 عضو'}</small></div>`).join('')||'<p class="muted">عضوی وجود ندارد.</p>'}`;
  } else if(page==='polls'){title='🗳️ رأی‌گیری';body=`<div class="poll-card"><div class="poll-title"><b>فردا کجا برویم؟</b><span>فعال</span></div>${['🌲 جواهرده','🌿 جنگل دالخانی','🌊 رامسر'].map((x,i)=>`<div class="poll-option"><span>${x}</span><b>${[6,4,2][i]} رأی</b></div><div class="bar"><i style="width:${[50,33,17][i]}%"></i></div>`).join('')}<button class="btn">ثبت رأی من</button></div>`;
  } else if(page==='locations'){title='📍 مکان‌های دیدنی';body=['جواهرده','جنگل دالخانی','ساحل رامسر'].map(x=>`<div class="list-item"><b>📍 ${x}</b><p>مکان پیشنهادی سفر</p><button class="btn">پیشنهاد برای رأی‌گیری</button></div>`).join('');
  } else if(page==='itinerary'){title='🗺️ برنامه سفر';body=['۱۰:۰۰ — 📍 جواهرده','۱۴:۳۰ — 🍽️ ناهار','۱۷:۰۰ — 🌊 ساحل رامسر','۲۰:۰۰ — 🏠 بازگشت'].map(x=>`<div class="list-item" ${x.startsWith('📷')?'onclick="showPage(\'album\')"':''}><b>${x}</b></div>`).join('');
@@ -48,11 +48,48 @@ window.showPage=async function showPage(page){let title='',body='';
 window.closeModal=function closeModal(){modal().classList.add('hidden')}
 window.approveExpense=async(id)=>{if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند تأیید کند.');const {error}=await window.sb.from('expenses').update({status:'approved',approved_by:window.authState.session.user.id,approved_at:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return;}await loadExpenses();showPage('pending');};
 window.rejectExpense=async(id)=>{if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند رد کند.');const reason=prompt('دلیل رد هزینه (اختیاری):')||null;const {error}=await window.sb.from('expenses').update({status:'rejected',rejection_reason:reason}).eq('id',id);if(error){alert(error.message);return;}await loadExpenses();showPage('pending');};
-function approveMember(i){const m=state.pendingMembers[i];modal().innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>تأیید عضویت</h2><div class="form"><label>نام عضو<input id="mn" value="${m.name}"></label><label>ضریب مشارکت<input id="mw" type="number" step="0.1" value="1"></label><label>سهم هدف صندوق<input id="mc" type="number" value="12000000"></label><label>نقش<select id="mr"><option>کاربر</option><option>ادمین</option></select></label><button class="btn" onclick="activateMember(${i})">✓ تأیید و فعال‌سازی</button></div></div>`;}
-function activateMember(i){const n=$('#mn').value,w=Number($('#mw').value),c=Number($('#mc').value);state.members.push([n,w,c]);state.pendingMembers.splice(i,1);showPage('members')}
-function rejectMember(i){state.pendingMembers.splice(i,1);showPage('members')}
-function addMember(){modal().innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>➕ افزودن عضو</h2><div class="form"><label>نام و نام خانوادگی<input id="an"></label><label>شماره موبایل<input id="ap"></label><label>ضریب مشارکت<input id="aw" type="number" step="0.1" value="1"></label><label>سهم هدف صندوق<input id="ac" type="number" value="12000000"></label><button class="btn" onclick="saveMember()">ایجاد کاربر</button></div></div>`}
-function saveMember(){state.members.push([$('#an').value,Number($('#aw').value),Number($('#ac').value)]);showPage('members')}
+async function loadMembershipRequests(){
+ if(!window.authState?.tripId){state.pendingMembers=[];return []}
+ const {data,error}=await window.sb.from('membership_requests').select('id,trip_id,user_id,full_name,phone,note,status,requested_at').eq('trip_id',window.authState.tripId).eq('status','pending').order('requested_at',{ascending:false});
+ if(error){console.error('membership requests',error);state.pendingMembers=[];return []}
+ state.pendingMembers=data||[];return state.pendingMembers;
+}
+window.approveMember=async(requestId)=>{
+ const m=state.pendingMembers.find(x=>String(x.id)===String(requestId));
+ if(!m)return alert('درخواست عضویت پیدا نشد.');
+ modal().innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>✓ تأیید عضویت</h2><div class="form"><label>نام عضو<input id="mn" value="${escapeHtml(m.full_name||'')}"></label><label>ضریب مشارکت<input id="mw" type="number" step="0.1" min="0.001" value="1"></label><label>سهم هدف صندوق<input id="mc" type="number" min="0" value="12000000"></label><button class="btn" onclick="activateMember('${m.id}')">✓ تأیید و فعال‌سازی</button></div></div>`;modal().classList.remove('hidden');
+};
+window.activateMember=async(requestId)=>{
+ if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند اعضا را تأیید کند.');
+ const n=$('#mn')?.value.trim(),w=Number($('#mw')?.value||1),c=Number($('#mc')?.value||0);
+ const {error}=await window.sb.rpc('approve_membership_request',{p_request_id:Number(requestId),p_name:n,p_share_weight:w,p_contribution_target:c,p_role:'member'});
+ if(error){alert('تأیید عضویت انجام نشد:\n'+error.message);return;}
+ closeModal();await loadTripMembers();await loadMembershipRequests();await showPage('members');
+};
+window.rejectMember=async(requestId)=>{
+ if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند درخواست را رد کند.');
+ const reason=prompt('دلیل رد درخواست (اختیاری):')||null;
+ const {error}=await window.sb.rpc('reject_membership_request',{p_request_id:Number(requestId),p_reason:reason});
+ if(error){alert('رد درخواست انجام نشد:\n'+error.message);return;}
+ await loadMembershipRequests();await showPage('members');
+};
+window.addMember=()=>{
+ if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند عضو اضافه کند.');
+ const m=document.querySelector('#modal');
+ if(!m)return alert('پنجره افزودن عضو پیدا نشد. صفحه را یک‌بار بازخوانی کنید.');
+ m.innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>➕ افزودن عضو</h2><p class="muted">کاربر باید قبلاً در برنامه حساب ساخته باشد. شماره موبایل را دقیقاً همان‌طور که در پروفایل ثبت شده وارد کنید.</p><div class="form"><label>نام و نام خانوادگی (اختیاری)<input id="an" autocomplete="name"></label><label>شماره موبایل<input id="ap" type="tel" autocomplete="tel" placeholder="مثلاً 0912..." required></label><label>ضریب مشارکت<input id="aw" type="number" step="0.1" min="0.001" value="1"></label><label>سهم هدف صندوق<input id="ac" type="number" min="0" value="12000000"></label><button class="btn" onclick="saveMember()">افزودن عضو</button></div></div>`;
+ m.classList.remove('hidden');
+};
+window.saveMember=async()=>{
+ if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند عضو اضافه کند.');
+ const phone=$('#ap')?.value.trim(),name=$('#an')?.value.trim()||null,w=Number($('#aw')?.value||1),c=Number($('#ac')?.value||0);
+ if(!phone)return alert('شماره موبایل را وارد کنید.');
+ if(!window.authState?.tripId)return alert('ابتدا یک سفر را انتخاب کنید.');
+ const {error}=await window.sb.rpc('add_trip_member_by_phone',{p_trip_id:window.authState.tripId,p_phone:phone,p_name:name,p_share_weight:w,p_contribution_target:c});
+ if(error){alert('افزودن عضو انجام نشد:\n'+error.message+'\n\nاگر این شماره هنوز حساب کاربری ندارد، از «کپی لینک دعوت» استفاده کنید.');return;}
+ alert('عضو با موفقیت به سفر اضافه شد.');closeModal();await loadTripMembers();await showPage('members');
+};
+
 window.newExpense=async()=>{
  if(!window.authState?.session){showAuth();return;}
  if(!window.authState?.tripId){alert('ابتدا عضو یک سفر شوید.');return;}
