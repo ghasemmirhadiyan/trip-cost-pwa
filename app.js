@@ -65,7 +65,7 @@ window.showPage=async function showPage(page){let title='',body='';
  } else if(page==='about'){title='ℹ️ درباره برنامه';body=`<div class="about-card"><div class="about-logo">🌲</div><div class="about-kicker">سفر شمال ۱۴۰۵</div><h3>همه‌چیز برای یک سفر خانوادگی بهتر</h3><p>این برنامه برای مدیریت ساده و شفاف هزینه‌ها، صندوق سفر، اعضا، مکان‌های پیشنهادی، برنامه سفر و خاطرات تصویری طراحی شده است تا همه اعضای خانواده اطلاعات سفر را یکجا ببینند و هماهنگ باشند.</p><div class="about-features"><span>💰 مدیریت هزینه</span><span>🏦 صندوق مشترک</span><span>🗺️ برنامه سفر</span><span>📷 آلبوم خاطرات</span></div><div class="creator-card"><div class="creator-avatar">ق</div><div><small>سازنده و مدیر برنامه</small><strong>قاسم میرهادیان</strong><p>طراحی و توسعه با هدف ساده‌تر شدن مدیریت سفرهای خانوادگی</p></div></div><div class="about-footer">با آرزوی سفری شاد، آرام و پر از خاطرات خوب ❤️</div></div>`;
  } else if(page==='profile'){title='👤 پروفایل';const u=window.authState?.profile, m=window.authState?.member;body=`<div class="profile-card"><div class="profile-avatar">${u?.avatar_url?`<img src="${escapeAttr(u.avatar_url)}" alt="پروفایل">`:(escapeHtml((u?.display_name||state.user||'ق').slice(0,1)))}</div><button class="btn small" onclick="uploadProfilePhoto()">📷 ${u?.avatar_url?'تغییر عکس پروفایل':'افزودن عکس پروفایل'}</button><h3>${u?.display_name||state.user||'کاربر'}</h3><p>${u?.phone||'شماره موبایل ثبت نشده'}</p><p>${window.authState?.session?.user?.email||'ایمیل ثبت نشده'}</p><span class="badge ${m?.role==='admin'?'approved':'pending'}">${m?.role==='admin'?'👑 مدیر سفر':'👤 عضو سفر'}</span></div><div class="list-item"><b>🧳 سفر فعال</b><p>${window.authState?.trip?.title||state.trip}</p></div>${m?.role==='admin'?'<button class="btn" onclick="showPage(\'admin\')">👑 پنل مدیریت</button>':''}${window.authState?.session?'<button class="btn danger" onclick="logoutUser()">خروج از حساب</button>':'<button class="btn" onclick="showAuth()">ورود / ایجاد حساب</button>'}`;
 } else if(page==='admin'){title='👑 پنل مدیریت';body=`<div class="admin-grid"><button onclick="showPage('members')">👥<b>اعضا</b><small>مدیریت اعضا</small></button><button onclick="showPage('pending')">🟡<b>تأیید هزینه‌ها</b><small>بررسی هزینه‌های جدید</small></button><button>📊<b>گزارش‌ها</b><small>Excel / PDF</small></button></div>`;
- } else {title='☰ امکانات بیشتر';body=['📷 آلبوم عکس','🎒 چک‌لیست سفر','🔔 اعلان‌ها','📊 گزارش‌ها و نمودارها','⚙️ تنظیمات'].map(x=>`<div class="list-item" ${x.startsWith('📷')?'onclick="showPage(\'album\')"':''}><b>${x}</b></div>`).join('')+`<div class="list-item about-menu-item" onclick="showPage('about')"><b>ℹ️ درباره برنامه</b><p>معرفی برنامه و سازنده</p></div>`+(state.role==='admin'?`<div class="list-item" onclick="showPage('admin')"><b>👑 پنل مدیریت</b><p>مدیریت اعضا، تأییدها و سفرها</p></div>`:'');}
+ } else {title='☰ امکانات بیشتر';body=`<div class="list-item install-menu-item" onclick="installPWA()"><b>📲 نصب برنامه روی اندروید</b><p>نصب مستقیم روی صفحه اصلی موبایل</p></div>`+['📷 آلبوم عکس','🎒 چک‌لیست سفر','🔔 اعلان‌ها','📊 گزارش‌ها و نمودارها','⚙️ تنظیمات'].map(x=>`<div class="list-item" ${x.startsWith('📷')?'onclick="showPage(\'album\')"':''}><b>${x}</b></div>`).join('')+`<div class="list-item about-menu-item" onclick="showPage('about')"><b>ℹ️ درباره برنامه</b><p>معرفی برنامه و سازنده</p></div>`+(state.role==='admin'?`<div class="list-item" onclick="showPage('admin')"><b>👑 پنل مدیریت</b><p>مدیریت اعضا، تأییدها و سفرها</p></div>`:'');}
  const target=document.querySelector('#app'); if(target){target.innerHTML=`<button class="back-home" onclick="showPage('home')">← بازگشت به داشبورد</button><section class="page-panel"><h2>${title}</h2>${body}</section>`; window.scrollTo({top:0,behavior:'smooth'}); } }
 window.closeModal=function closeModal(){modal().classList.add('hidden')}
 window.approveExpense=async(id)=>{if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند تأیید کند.');const {error}=await window.sb.from('expenses').update({status:'approved',approved_by:window.authState.session.user.id,approved_at:new Date().toISOString()}).eq('id',id);if(error){alert(error.message);return;}await loadExpenses();showPage('pending');};
@@ -377,3 +377,86 @@ document.addEventListener('click',e=>{
  const b=e.target.closest('[data-page]');if(b){e.preventDefault();showPage(b.dataset.page);return;}
  if(e.target===modal())closeModal();
 });renderPending();setTimeout(loadExpenses,500);setTimeout(loadHomeAlbum,800);
+
+
+// ===== PWA install + personal financial notice (v13.6) =====
+window.deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.deferredInstallPrompt = e;
+  document.querySelectorAll('.pwa-install-trigger').forEach(el => el.classList.add('ready'));
+});
+window.addEventListener('appinstalled', () => {
+  window.deferredInstallPrompt = null;
+  showToast?.('✅ برنامه با موفقیت روی دستگاه نصب شد');
+});
+window.installPWA = async function(){
+  const p = window.deferredInstallPrompt;
+  if (p) {
+    p.prompt();
+    const choice = await p.userChoice;
+    if (choice?.outcome === 'accepted') showToast?.('✅ نصب برنامه شروع شد');
+    window.deferredInstallPrompt = null;
+    return;
+  }
+  const ua = navigator.userAgent || '';
+  if (/Android/i.test(ua)) {
+    alert('برای نصب در Chrome، از منوی ⋮ گزینه «Install app / نصب برنامه» یا «Add to Home screen / افزودن به صفحه اصلی» را انتخاب کنید.');
+  } else {
+    alert('این برنامه یک PWA است. در مرورگر پشتیبانی‌شده گزینه Install / Add to Home Screen را انتخاب کنید.');
+  }
+};
+
+function buildSmartTransfers(members){
+  const eps=1;
+  const creditors=[], debtors=[];
+  for(const m of members||[]){
+    const balance=Number(m.direct_paid||0)-Number(m.calculated_share||0);
+    if(balance>eps) creditors.push({id:String(m.trip_member_id),name:m.name,amount:balance});
+    else if(balance<-eps) debtors.push({id:String(m.trip_member_id),name:m.name,amount:-balance});
+  }
+  creditors.sort((a,b)=>b.amount-a.amount); debtors.sort((a,b)=>b.amount-a.amount);
+  const transfers=[]; let i=0,j=0;
+  while(i<debtors.length && j<creditors.length){
+    const amount=Math.min(debtors[i].amount,creditors[j].amount);
+    if(amount>eps) transfers.push({from:debtors[i],to:creditors[j],amount});
+    debtors[i].amount-=amount; creditors[j].amount-=amount;
+    if(debtors[i].amount<=eps)i++; if(creditors[j].amount<=eps)j++;
+  }
+  return transfers;
+}
+window.renderPersonalFinancialNotice = async function(showPopup=false){
+  try{
+    if(!window.authState?.session || !window.authState?.member?.id) return;
+    const f=await loadFinancialSummary();
+    const members=f?.members||[];
+    const myId=String(window.authState.member.id);
+    const me=members.find(x=>String(x.trip_member_id)===myId);
+    if(!me) return;
+    const fundTarget=Number(me.contribution_target||0), fundPaid=Number(me.approved_contributions||0);
+    const fundDiff=fundPaid-fundTarget;
+    const expenseBalance=Number(me.direct_paid||0)-Number(me.calculated_share||0);
+    const transfers=buildSmartTransfers(members);
+    const mine=transfers.filter(t=>t.from.id===myId || t.to.id===myId);
+    const rows=[];
+    if(fundDiff<0) rows.push(`<div class="finance-msg debt"><span>🏦</span><div><b>بدهی شما به صندوق</b><strong>${money(-fundDiff)} تومان</strong></div></div>`);
+    else if(fundDiff>0) rows.push(`<div class="finance-msg credit"><span>🏦</span><div><b>طلب شما از صندوق</b><strong>${money(fundDiff)} تومان</strong></div></div>`);
+    else rows.push(`<div class="finance-msg settled"><span>✅</span><div><b>حساب شما با صندوق تسویه است</b><small>تعهد صندوق کامل پرداخت شده است.</small></div></div>`);
+    if(mine.length){
+      mine.forEach(t=>{
+        if(t.from.id===myId) rows.push(`<div class="finance-msg debt"><span>👤</span><div><b>باید به ${escapeHtml(t.to.name)} پرداخت کنید</b><strong>${money(t.amount)} تومان</strong></div></div>`);
+        else rows.push(`<div class="finance-msg credit"><span>👤</span><div><b>${escapeHtml(t.from.name)} باید به شما پرداخت کند</b><strong>${money(t.amount)} تومان</strong></div></div>`);
+      });
+    } else if(Math.abs(expenseBalance)<1) rows.push(`<div class="finance-msg settled"><span>🤝</span><div><b>حساب هزینه‌های شخصی شما تسویه است</b><small>در حال حاضر بدهی یا طلبی از اعضا ندارید.</small></div></div>`);
+    const summary=`<div class="personal-finance-card"><div class="personal-finance-head"><div><small>وضعیت مالی من</small><h3>${escapeHtml(me.name||'عضو سفر')}</h3></div><span>💳</span></div>${rows.join('')}<button class="btn small" onclick="showPage('settlement')">مشاهده جزئیات تسویه</button></div>`;
+    const target=document.querySelector('#personalFinanceNotice'); if(target) target.innerHTML=summary;
+    if(showPopup){
+      const key=`finance-notice:${window.authState.tripId}:${myId}`;
+      if(!sessionStorage.getItem(key)){
+        sessionStorage.setItem(key,'1');
+        const m=document.querySelector('#modal');
+        if(m){m.innerHTML=`<div class="sheet finance-popup"><button class="close" onclick="closeModal()">×</button><div class="finance-popup-icon">💰</div><h2>وضعیت مالی شما</h2><p class="muted">خلاصه بدهی و طلب شما در این سفر</p>${rows.join('')}<button class="btn" onclick="closeModal();showPage('settlement')">جزئیات تسویه</button></div>`;m.classList.remove('hidden');}
+      }
+    }
+  }catch(e){console.error('personal finance notice',e)}
+};
