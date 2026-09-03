@@ -76,18 +76,27 @@ window.rejectMember=async(requestId)=>{
 window.addMember=()=>{
  if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند عضو اضافه کند.');
  const m=document.querySelector('#modal');
- if(!m)return alert('پنجره افزودن عضو پیدا نشد. صفحه را یک‌بار بازخوانی کنید.');
- m.innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>➕ افزودن عضو</h2><p class="muted">کاربر باید قبلاً در برنامه حساب ساخته باشد. شماره موبایل را دقیقاً همان‌طور که در پروفایل ثبت شده وارد کنید.</p><div class="form"><label>نام و نام خانوادگی (اختیاری)<input id="an" autocomplete="name"></label><label>شماره موبایل<input id="ap" type="tel" autocomplete="tel" placeholder="مثلاً 0912..." required></label><label>ضریب مشارکت<input id="aw" type="number" step="0.1" min="0.001" value="1"></label><label>سهم هدف صندوق<input id="ac" type="number" min="0" value="12000000"></label><button type="button" class="btn" data-action="save-member">افزودن عضو</button></div></div>`;
+ if(!m)return alert('پنجره افزودن عضو پیدا نشد.');
+ m.innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>➕ ساخت حساب و افزودن عضو</h2><p class="muted">ادمین می‌تواند حساب کاربری را بسازد و اطلاعات ورود را مستقیماً به عضو بدهد.</p><div class="form"><label>نام و نام خانوادگی<input id="an" autocomplete="name" required></label><label>نام کاربری<input id="au" autocomplete="username" placeholder="مثلاً mehdi123" required></label><label>رمز عبور<input id="apass" type="password" autocomplete="new-password" minlength="6" required></label><label>شماره موبایل (اختیاری)<input id="aph" type="tel" autocomplete="tel" placeholder="0912..."></label><label>ضریب مشارکت<input id="aw" type="number" step="0.1" min="0.001" value="1"></label><label>سهم هدف صندوق<input id="ac" type="number" min="0" value="12000000"></label><label>نقش<select id="ar"><option value="member">عضو سفر</option><option value="admin">مدیر سفر</option></select></label><button type="button" class="btn" data-action="save-member">ساخت حساب و افزودن عضو</button></div></div>`;
  m.classList.remove('hidden');
 };
 window.saveMember=async()=>{
  if(window.authState?.member?.role!=='admin')return alert('فقط مدیر سفر می‌تواند عضو اضافه کند.');
- const phone=$('#ap')?.value.trim(),name=$('#an')?.value.trim()||null,w=Number($('#aw')?.value||1),c=Number($('#ac')?.value||0);
- if(!phone)return alert('شماره موبایل را وارد کنید.');
+ const name=$('#an')?.value.trim(),username=$('#au')?.value.trim().toLowerCase(),password=$('#apass')?.value||'',phone=$('#aph')?.value.trim()||null,w=Number($('#aw')?.value||1),c=Number($('#ac')?.value||0),role=$('#ar')?.value||'member';
+ if(!name||!username||!password)return alert('نام، نام کاربری و رمز عبور را کامل وارد کنید.');
+ if(password.length<6)return alert('رمز عبور باید حداقل ۶ کاراکتر باشد.');
  if(!window.authState?.tripId)return alert('ابتدا یک سفر را انتخاب کنید.');
- const {error}=await window.sb.rpc('add_trip_member_by_phone',{p_trip_id:window.authState.tripId,p_phone:phone,p_name:name,p_share_weight:w,p_contribution_target:c});
- if(error){alert('افزودن عضو انجام نشد:\n'+error.message+'\n\nاگر این شماره هنوز حساب کاربری ندارد، از «کپی لینک دعوت» استفاده کنید.');return;}
- alert('عضو با موفقیت به سفر اضافه شد.');closeModal();await loadTripMembers();await showPage('members');
+ const btn=document.querySelector('[data-action="save-member"]');if(btn)btn.disabled=true;
+ try{
+  const {data,error}=await window.sb.functions.invoke('create-trip-member',{body:{trip_id:window.authState.tripId,name,username,password,phone,share_weight:w,contribution_target:c,role}});
+  if(error)throw error;
+  if(data?.error)throw new Error(data.error);
+  closeModal();
+  await loadTripMembers();
+  await showPage('members');
+  const m=document.querySelector('#modal');
+  if(m){m.innerHTML=`<div class="sheet"><button class="close" onclick="closeModal()">×</button><h2>✅ حساب ساخته شد</h2><div class="list-item"><b>👤 ${escapeHtml(name)}</b><p>نام کاربری: <strong>${escapeHtml(username)}</strong></p><p>رمز عبور: <strong>${escapeHtml(password)}</strong></p><p class="muted">این اطلاعات را برای عضو ارسال کنید.</p></div><button class="btn" onclick="navigator.clipboard?.writeText('نام: ${escapeHtml(name)}\nنام کاربری: ${escapeHtml(username)}\nرمز عبور: ${escapeHtml(password)}').then(()=>alert('اطلاعات ورود کپی شد.'))">📋 کپی اطلاعات ورود</button></div>`;m.classList.remove('hidden');}
+ }catch(e){alert('ساخت حساب انجام نشد:\n'+(e.message||String(e)))}finally{if(btn)btn.disabled=false;}
 };
 
 window.newExpense=async()=>{
