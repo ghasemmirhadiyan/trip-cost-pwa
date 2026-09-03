@@ -60,3 +60,6 @@
 .app-message-text{margin:16px 0 22px;line-height:1.95;color:var(--text,#1f2937);font-size:14px}
 .message-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(max-width:420px){.message-actions{grid-template-columns:1fr}}
+
+.checklist-intro,.checklist-add{margin-bottom:12px}.checklist-add{display:flex;gap:8px}.checklist-add input{flex:1;padding:12px;border:1px solid #d7e0e0;border-radius:12px;font:inherit}.check-row{display:flex;align-items:center;gap:10px}.check-row label{display:flex;align-items:center;gap:8px;cursor:pointer}.check-row input{width:20px;height:20px}.checkmark{font-size:22px}.check-content{flex:1}.check-content small{display:block;margin-top:4px;color:#718096}.checklist-item.done b{text-decoration:line-through;opacity:.65}.done-by{color:#15803d!important}.notification-row{display:flex;align-items:center;gap:12px;cursor:pointer}.notification-icon{font-size:28px}.notification-row small{color:#0f766e}
+.settlement-locked .message-actions,.settlement-locked .actions{margin-top:16px}.settlement-locked .home-return{margin-top:16px}
