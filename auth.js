@@ -38,9 +38,9 @@ async function loadIdentity(){
   }
 }
 
-window.showAuth=()=>{
+window.showAuth=(forced=false)=>{
  const m=document.querySelector('#modal');
- m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><div class="auth-brand">🌲</div><h2>ورود به سفر</h2><p class="muted">برای استفاده از برنامه وارد حساب خود شوید.</p><div class="form"><label>نام کاربری یا ایمیل<input id="authEmail" autocomplete="username"></label><label>رمز عبور<input id="authPassword" type="password" autocomplete="current-password"></label><button class="btn" onclick="loginUser()">ورود</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
+ m.innerHTML=`<div class="sheet auth-sheet">${forced?'':'<button class="close" onclick="closeModal()">×</button>'}<div class="auth-brand">🌲</div><h2>ورود به سفر</h2><p class="muted">برای استفاده از برنامه وارد حساب خود شوید.</p><div class="form"><label>نام کاربری یا ایمیل<input id="authEmail" autocomplete="username"></label><label>رمز عبور<input id="authPassword" type="password" autocomplete="current-password"></label><button class="btn" onclick="loginUser()">ورود</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
 };
 window.showSignup=()=>{
  const m=document.querySelector('#modal');m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><h2>ایجاد حساب</h2><div class="form"><label>نام و نام خانوادگی<input id="suName" autocomplete="name"></label><label>موبایل<input id="suPhone" autocomplete="tel"></label><label>ایمیل<input id="suEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="suPass" type="password" minlength="6"></label><button class="btn" onclick="signupUser()">ثبت‌نام</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button><button class="btn secondary" onclick="showAuth()">بازگشت به ورود</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');

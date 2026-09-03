@@ -9,3 +9,7 @@
 
 #authMsg.error{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px;white-space:pre-line;margin-top:12px}#authMsg{white-space:pre-line}
 .check-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #e5e7eb;border-radius:10px;margin-top:7px;background:#fff}.check-row input{width:18px;height:18px}.check-row small{color:#6b7280}.hidden{display:none!important}
+
+/* v12.1: hide the application until the user is authenticated */
+.unauthenticated .app-shell{visibility:hidden;pointer-events:none}
+.unauthenticated .modal{visibility:visible}
