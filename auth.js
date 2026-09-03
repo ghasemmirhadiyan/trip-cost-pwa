@@ -40,10 +40,10 @@ async function loadIdentity(){
 
 window.showAuth=(forced=false)=>{
  const m=document.querySelector('#modal');
- m.innerHTML=`<div class="sheet auth-sheet">${forced?'':'<button class="close" onclick="closeModal()">×</button>'}<div class="auth-brand">🌲</div><h2>ورود به سفر</h2><p class="muted">برای استفاده از برنامه وارد حساب خود شوید.</p><div class="form"><label>نام کاربری یا ایمیل<input id="authEmail" autocomplete="username"></label><label>رمز عبور<input id="authPassword" type="password" autocomplete="current-password"></label><button class="btn" onclick="loginUser()">ورود</button><button class="btn secondary" onclick="showSignup()">➕ ایجاد حساب جدید</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
+ m.innerHTML=`<div class="sheet auth-sheet">${forced?'':'<button class="close" onclick="closeModal()">×</button>'}<div class="auth-brand">🌲</div><h2>ورود به سفر</h2><p class="muted">برای استفاده از برنامه وارد حساب خود شوید.</p><div class="form"><label>نام کاربری یا ایمیل<input id="authEmail" autocomplete="username"></label><label>رمز عبور<input id="authPassword" type="password" autocomplete="current-password"></label><button class="btn" onclick="loginUser()">ورود</button><button class="btn secondary" onclick="showSignup()">➕ ایجاد حساب جدید</button><button type="button" class="btn secondary test-connection-btn" onclick="testSupabaseConnection(true)">Test Connection</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
 };
 window.showSignup=()=>{
- const m=document.querySelector('#modal');m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><h2>ایجاد حساب</h2><p class="muted">اگر با لینک دعوت وارد شده‌اید، بعد از ساخت حساب درخواست عضویت شما برای مدیر سفر ارسال می‌شود. ضریب پیش‌فرض عضویت <b>۱</b> است و مدیر می‌تواند آن را تغییر دهد.</p><div class="form"><label>نام و نام خانوادگی<input id="suName" autocomplete="name"></label><label>موبایل<input id="suPhone" autocomplete="tel"></label><label>ایمیل<input id="suEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="suPass" type="password" minlength="6"></label><button class="btn" onclick="signupUser()">ثبت‌نام</button><button class="btn secondary" onclick="testSupabaseConnection(true)">🔎 تست اتصال Supabase</button><button class="btn secondary" onclick="showAuth()">بازگشت به ورود</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
+ const m=document.querySelector('#modal');m.innerHTML=`<div class="sheet auth-sheet"><button class="close" onclick="closeModal()">×</button><h2>ایجاد حساب</h2><p class="muted">اگر با لینک دعوت وارد شده‌اید، بعد از ساخت حساب درخواست عضویت شما برای مدیر سفر ارسال می‌شود. ضریب پیش‌فرض عضویت <b>۱</b> است و مدیر می‌تواند آن را تغییر دهد.</p><div class="form"><label>نام و نام خانوادگی<input id="suName" autocomplete="name"></label><label>موبایل<input id="suPhone" autocomplete="tel"></label><label>ایمیل<input id="suEmail" type="email" autocomplete="email"></label><label>رمز عبور<input id="suPass" type="password" minlength="6"></label><button class="btn" onclick="signupUser()">ثبت‌نام</button><button type="button" class="btn secondary test-connection-btn" onclick="testSupabaseConnection(true)">Test Connection</button><button class="btn secondary" onclick="showAuth()">بازگشت به ورود</button></div><div id="authMsg" class="muted"></div></div>`;m.classList.remove('hidden');
 };
 function authErrorText(error, action='درخواست'){
   if(!error) return '';
@@ -68,35 +68,24 @@ function authErrorText(error, action='درخواست'){
 window.testSupabaseConnection=async(show=true)=>{
   const url=window.SUPABASE_CONFIG?.url||'';
   const key=window.SUPABASE_CONFIG?.anonKey||'';
-  const result={ok:false,url,keyPresent:!!key,status:null,message:'',details:[]};
-  const render=(text,ok)=>{ const msg=document.querySelector('#authMsg'); if(msg){msg.textContent=text;msg.classList.toggle('error',!ok);} };
+  const result={ok:false,url,keyPresent:!!key,status:null,message:''};
+  const render=(text,ok)=>{ const msg=document.querySelector('#authMsg'); if(msg){msg.textContent=text;msg.className=ok?'connection-result success':'connection-result error';} };
   try{
-    result.details.push('1) بررسی تنظیمات برنامه...');
-    if(!url || !/^https:\/\/[^/]+\.supabase\.co$/.test(url)) throw new Error('آدرس Supabase نامعتبر است: '+url);
-    if(!key) throw new Error('کلید Publishable/anon در supabase-config.js وجود ندارد.');
-    result.details.push('2) ارسال درخواست به Auth API...');
+    if(!url || !/^https:\/\/[^/]+\.supabase\.co$/.test(url)) throw new Error('آدرس Supabase نامعتبر است.');
+    if(!key) throw new Error('کلید اتصال وجود ندارد.');
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),10000);
     let r;
     try{ r=await fetch(url+'/auth/v1/settings',{method:'GET',headers:{apikey:key,Authorization:'Bearer '+key},cache:'no-store',signal:controller.signal}); }
     finally{ clearTimeout(timer); }
     result.status=r.status;
-    const text=await r.text().catch(()=> '');
-    if(!r.ok) throw new Error(`Supabase پاسخ HTTP ${r.status} داد${text?' — '+text.slice(0,500):''}`);
-    result.details.push(`3) پاسخ سرور دریافت شد (HTTP ${r.status})`);
-    result.ok=true; result.message='اتصال به Supabase برقرار است.';
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    result.ok=true; result.message='موفق';
   }catch(e){
-    const msg=e?.name==='AbortError'?'زمان اتصال بیش از ۱۰ ثانیه شد.':(e?.message||String(e));
-    result.message=msg; result.details.push('❌ '+msg);
-    console.error('[Supabase connection test]',result,e);
+    result.message=e?.name==='AbortError'?'اتصال زمان‌بر شد':(e?.message||'ناموفق');
+    console.error('[Supabase connection test]',e);
   }
-  if(show){
-    if(result.ok){
-      render('✅ اتصال به Supabase برقرار است.\n'+result.details.join('\n')+'\n\nProject: '+result.url, true);
-    }else{
-      render('❌ تست اتصال ناموفق بود\n'+result.details.join('\n')+'\n\nآدرس: '+(result.url||'تعریف نشده')+'\nکلید: '+(result.keyPresent?'وجود دارد':'وجود ندارد')+'\nHTTP: '+(result.status??'دریافت نشد')+'\n\nاگر اینجا هم Failed to fetch می‌بینی، مشکل قبل از ثبت‌نام و در ارتباط مرورگر با Supabase است.', false);
-    }
-  }
+  if(show) render(result.ok?'موفق ✓':'ناموفق ✕',result.ok);
   return result;
 };
 window.loginUser=async()=>{
