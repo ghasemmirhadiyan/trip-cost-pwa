@@ -1,4 +1,4 @@
-const APP_VERSION = "13.4"
+const APP_VERSION = "13.7"
 const state={role:'admin',user:'قاسم',trip:'سفر شمال ۱۴۰۵',pendingMembers:[],members:[],expenses:[],locations:[],itinerary:[],shareAmount:12000000};
 const $=s=>document.querySelector(s); let modal=()=>document.querySelector('#modal');
 const money=n=>new Intl.NumberFormat('fa-IR').format(Number(n)||0)+' تومان';
@@ -60,7 +60,7 @@ window.showPage=async function showPage(page){let title='',body='';
  } else if(page==='members'){await loadTripSettings();await loadTripMembers();const fin=await loadFinancialSummary();const fm=Object.fromEntries((fin?.members||[]).map(x=>[String(x.trip_member_id),x]));const pendingReqs=window.authState?.member?.role==='admin'?await loadMembershipRequests():[];title='👥 اعضای سفر';body=`<div class="stat primary"><span>💰 مبلغ هر سهم</span><strong>${money(state.shareAmount)}</strong><small>تعهد صندوق هر عضو بر اساس ضریب ثابت سفر محاسبه می‌شود</small></div>${window.authState?.member?.role==='admin'?`<button class="btn" onclick="editShareAmount()">✏️ تغییر مبلغ هر سهم</button><button class="btn secondary" onclick="copyInvite()">🔗 ساخت و کپی لینک دعوت</button><div class="list-item"><b>📨 درخواست‌های عضویت</b><p class="muted">هر کسی با لینک دعوت حساب بسازد، تا تأیید مدیر عضو فعال نمی‌شود.</p>${pendingReqs.length?pendingReqs.map(r=>`<div class="membership-request"><b>${escapeHtml(r.full_name)}</b><small>${escapeHtml(r.phone||'شماره ثبت نشده')} • ${new Date(r.requested_at).toLocaleString('fa-IR')}</small>${r.note?`<p>${escapeHtml(r.note)}</p>`:''}<div class="actions"><button class="btn small" onclick="approveMember('${r.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectMember('${r.id}')">× رد</button></div></div>`).join(''):'<p class="muted">درخواست جدیدی وجود ندارد.</p>'}</div>`:''}<button type="button" class="btn" data-action="add-member">➕ ساخت حساب و افزودن عضو</button><p class="muted">بدهی یا طلب صندوق بر اساس واریزی‌های تأییدشده محاسبه می‌شود.</p>${state.members.map(m=>{const f=fm[String(m.id)]||{};const target=Number(m.contribution_target||f.contribution_target||0);const paid=Number(f.approved_contributions||0);const diff=paid-target;const balanceHtml=diff<0?`<span class="fund-debt">🔴 بدهی به صندوق: ${money(-diff)}</span>`:diff>0?`<span class="fund-credit">🟢 طلب از صندوق: ${money(diff)}</span>`:`<span class="fund-settled">⚪ تسویه شده</span>`;return `<div class="list-item member-item"><div class="member-head"><div class="mini-avatar">${m.avatar_url?`<img src="${escapeAttr(m.avatar_url)}" alt="">`:(escapeHtml((m.name||'ع').slice(0,1)))}</div><b>${escapeHtml(m.name)}</b></div><div class="member-finance"><div><small>تعهد صندوق</small><strong>${money(target)}</strong></div><div>${balanceHtml}</div></div><small>${m.role==='admin'?'👑 مدیر سفر':'👤 عضو'}</small>${window.authState?.member?.role==='admin'?`<div class="actions"><button class="btn small" onclick="editMember('${m.id}')">✏️ ویرایش پروفایل</button>${m.user_id!==window.authState?.session?.user?.id?`<button class="btn danger small" onclick="deleteMember('${m.id}','${escapeAttr(m.name)}')">🗑️ حذف</button>`:''}</div>`:''}</div>`}).join('')||'<p class="muted">عضوی وجود ندارد.</p>'}`;
  } else if(page==='locations'){await loadLocations();title='📍 مکان‌های دیدنی';body=`<button class="btn" data-action="add-location">➕ پیشنهاد مکان جدید</button><p class="muted">هر عضو می‌تواند مکان پیشنهاد کند؛ مکان پیشنهادی پس از تأیید مدیر برای همه قابل استفاده است.</p>${state.locations.map(l=>{const st=l.status||'pending';const cls=st==='approved'?'approved':st==='rejected'?'danger':'pending';const actions=window.authState?.member?.role==='admin'&&st==='pending'?`<div class="actions"><button class="btn small" onclick="approveLocation('${l.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectLocation('${l.id}')">× رد</button></div>`:'';return `<div class="list-item"><span class="badge ${cls}">${statusFa(st)}</span><b>📍 ${escapeHtml(l.name)}</b>${l.category?`<p>دسته‌بندی: ${escapeHtml(l.category)}</p>`:''}${l.description?`<p>${escapeHtml(l.description)}</p>`:''}${l.suggested_duration_minutes?`<small>⏱️ حدود ${l.suggested_duration_minutes} دقیقه</small>`:''}${l.map_url?`<p><a href="${escapeAttr(l.map_url)}" target="_blank" rel="noopener">🗺️ مشاهده روی نقشه</a></p>`:''}${actions}</div>`}).join('')||'<div class="empty-state">هنوز مکانی پیشنهاد نشده است.</div>'}`;
  } else if(page==='itinerary'){await loadItinerary();title='🗺️ برنامه سفر';body=`<button class="btn" onclick="addItineraryProposal()">➕ پیشنهاد برنامه جدید</button><p class="muted">همه اعضای سفر می‌توانند برنامه پیشنهاد دهند؛ برنامه پس از تأیید مدیر برای همه قطعی می‌شود.</p>${state.itinerary.map(x=>{const st=x.status||'pending';const cls=st==='approved'?'approved':st==='rejected'?'danger':'pending';const actions=window.authState?.member?.role==='admin'&&st==='pending'?`<div class="actions"><button class="btn small" onclick="approveItinerary('${x.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectItinerary('${x.id}')">× رد</button></div>`:'';const tm=[x.start_time,x.end_time].filter(Boolean).join(' تا ');return `<div class="list-item"><span class="badge ${cls}">${statusFa(st)}</span><b>${escapeHtml(x.title)}</b><p>📅 ${escapeHtml(x.item_date||'')}${tm?' • ⏰ '+escapeHtml(tm):''}</p>${x.description?`<p>${escapeHtml(x.description)}</p>`:''}${x.location?.name?`<small>📍 ${escapeHtml(x.location.name)}</small>`:''}${actions}</div>`}).join('')||'<div class="empty-state">هنوز برنامه‌ای ثبت نشده است.</div>'}`;
- } else if(page==='settlement'){title='💸 وضعیت مالی';body=`<div class="stat primary"><span>کل هزینه‌های تأییدشده</span><strong id="approvedTotal">در حال محاسبه...</strong></div><div id="financialMembers"></div>`;setTimeout(async()=>{const f=await loadFinancialSummary();const t=f?.trip||{};const el=document.querySelector('#financialMembers');const total=document.querySelector('#approvedTotal');if(total)total.textContent=money(t.approved_expenses);if(el)el.innerHTML=(f?.members||[]).map(m=>{const balance=Number(m.direct_paid||0)-Number(m.calculated_share||0);const st=balance>0?'طلبکار':balance<0?'بدهکار':'تسویه';const fundDebt=Math.max(0,Number(m.fund_claim||0));const paid=Number(m.approved_contributions||0);return `<div class="list-item"><b>${escapeHtml(m.name)}</b><span class="badge ${balance>0?'approved':balance<0?'pending':'approved'}">${st}</span><p>سهم هزینه: ${money(m.calculated_share)} • پرداخت شخصی: ${money(m.direct_paid)}</p><small>وضعیت صندوق: تعهد ${money(m.contribution_target)} • پرداخت ${money(paid)} • ${fundDebt?`بدهی ${money(fundDebt)}`:paid>Number(m.contribution_target||0)?`طلب ${money(paid-Number(m.contribution_target||0))}`:'تسویه'}</small><small>مانده هزینه‌ها: ${money(Math.abs(balance))}</small></div>`}).join('')||'<div class="empty-state">اطلاعات مالی وجود ندارد.</div>';},0);
+ } else if(page==='settlement'){title='💸 تسویه نهایی سفر';body=`<div class="settlement-intro"><b>این بخش برای پایان سفر است</b><p>در طول سفر فقط وضعیت بدهی اعضا به صندوق نمایش داده می‌شود. در پایان سفر، مانده صندوق و تسویه بین اعضا در اینجا محاسبه می‌شود.</p></div><div id="finalSettlement"><div class="empty-state">در حال محاسبه تسویه نهایی...</div></div>`;setTimeout(renderFinalSettlement,0);
  } else if(page==='album'){title='📷 آلبوم سفر';body=`<div class="album-toolbar"><p class="muted">اعضای فعال سفر می‌توانند عکس اضافه کنند، لایک کنند و نظر بگذارند.</p><button class="btn" onclick="uploadPhoto()">📤 آپلود عکس</button></div><div id="albumGrid" class="album-grid"><div class="empty-state">در حال بارگذاری آلبوم...</div></div>`; setTimeout(loadAlbum,0);
  } else if(page==='about'){title='ℹ️ درباره برنامه';body=`<div class="about-card"><div class="about-logo">🌲</div><div class="about-kicker">سفر شمال ۱۴۰۵</div><h3>همه‌چیز برای یک سفر خانوادگی بهتر</h3><p>این برنامه برای مدیریت ساده و شفاف هزینه‌ها، صندوق سفر، اعضا، مکان‌های پیشنهادی، برنامه سفر و خاطرات تصویری طراحی شده است تا همه اعضای خانواده اطلاعات سفر را یکجا ببینند و هماهنگ باشند.</p><div class="about-features"><span>💰 مدیریت هزینه</span><span>🏦 صندوق مشترک</span><span>🗺️ برنامه سفر</span><span>📷 آلبوم خاطرات</span></div><div class="creator-card"><div class="creator-avatar">ق</div><div><small>سازنده و مدیر برنامه</small><strong>قاسم میرهادیان</strong><p>طراحی و توسعه با هدف ساده‌تر شدن مدیریت سفرهای خانوادگی</p></div></div><div class="about-footer">با آرزوی سفری شاد، آرام و پر از خاطرات خوب ❤️</div></div>`;
  } else if(page==='profile'){title='👤 پروفایل';const u=window.authState?.profile, m=window.authState?.member;body=`<div class="profile-card"><div class="profile-avatar">${u?.avatar_url?`<img src="${escapeAttr(u.avatar_url)}" alt="پروفایل">`:(escapeHtml((u?.display_name||state.user||'ق').slice(0,1)))}</div><button class="btn small" onclick="uploadProfilePhoto()">📷 ${u?.avatar_url?'تغییر عکس پروفایل':'افزودن عکس پروفایل'}</button><h3>${u?.display_name||state.user||'کاربر'}</h3><p>${u?.phone||'شماره موبایل ثبت نشده'}</p><p>${window.authState?.session?.user?.email||'ایمیل ثبت نشده'}</p><span class="badge ${m?.role==='admin'?'approved':'pending'}">${m?.role==='admin'?'👑 مدیر سفر':'👤 عضو سفر'}</span></div><div class="list-item"><b>🧳 سفر فعال</b><p>${window.authState?.trip?.title||state.trip}</p></div>${m?.role==='admin'?'<button class="btn" onclick="showPage(\'admin\')">👑 پنل مدیریت</button>':''}${window.authState?.session?'<button class="btn danger" onclick="logoutUser()">خروج از حساب</button>':'<button class="btn" onclick="showAuth()">ورود / ایجاد حساب</button>'}`;
@@ -379,7 +379,65 @@ document.addEventListener('click',e=>{
 });renderPending();setTimeout(loadExpenses,500);setTimeout(loadHomeAlbum,800);
 
 
-// ===== PWA install + personal financial notice (v13.6) =====
+
+async function renderFinalSettlement(){
+  const el=document.querySelector('#finalSettlement');
+  if(!el || !window.authState?.tripId) return;
+  try{
+    await loadTripMembers();
+    const f=await loadFinancialSummary();
+    const t=f?.trip||{};
+    const members=state.members||[];
+    const byId=Object.fromEntries(members.map(m=>[String(m.id),m]));
+    const memberFinancial=f?.members||[];
+    const fundPaid=Object.fromEntries(memberFinancial.map(m=>[String(m.trip_member_id),Number(m.approved_contributions||0)]));
+    const {data:expenses,error:ee}=await window.sb.from('expenses').select('id,title,amount,from_fund,payer_member_id,status').eq('trip_id',window.authState.tripId).eq('status','approved');
+    if(ee) throw ee;
+    const approved=expenses||[];
+    const ids=approved.map(e=>e.id);
+    let parts=[];
+    if(ids.length){
+      const {data:p,error:pe}=await window.sb.from('expense_participants').select('expense_id,trip_member_id').in('expense_id',ids);
+      if(pe) throw pe; parts=p||[];
+    }
+    const partsByExpense={};
+    for(const p of parts)(partsByExpense[p.expense_id] ||= []).push(p.trip_member_id);
+    const fundExpenseShare=Object.fromEntries(members.map(m=>[String(m.id),0]));
+    const personalNet=Object.fromEntries(members.map(m=>[String(m.id),0]));
+    for(const e of approved){
+      const pids=(partsByExpense[e.id]||[]).map(Number).filter(id=>byId[String(id)]);
+      if(!pids.length) continue;
+      const totalWeight=pids.reduce((sum,id)=>sum+Number(byId[String(id)].share_weight||0),0)||pids.length;
+      for(const id of pids){
+        const share=Number(e.amount||0)*Number(byId[String(id)].share_weight||1)/totalWeight;
+        if(e.from_fund) fundExpenseShare[String(id)]=(fundExpenseShare[String(id)]||0)+share;
+        else personalNet[String(id)]=(personalNet[String(id)]||0)-share;
+      }
+      if(!e.from_fund && e.payer_member_id!=null) personalNet[String(e.payer_member_id)]=(personalNet[String(e.payer_member_id)]||0)+Number(e.amount||0);
+    }
+    const fundRows=members.map(m=>{
+      const id=String(m.id), paid=fundPaid[id]||0, expenseShare=fundExpenseShare[id]||0;
+      return {...m,finalFundBalance:paid-expenseShare};
+    });
+    const fundBalance=Number(t.current_fund_balance||0);
+    const surplus=Math.max(fundBalance,0), deficit=Math.max(-fundBalance,0);
+    const transfers=buildSmartTransfers(members.map(m=>({trip_member_id:m.id,name:m.name,direct_paid:Math.max(personalNet[String(m.id)]||0,0),calculated_share:0})).map(x=>({...x, direct_paid:personalNet[String(x.trip_member_id)]>0?personalNet[String(x.trip_member_id)]:0, calculated_share:personalNet[String(x.trip_member_id)]<0?-personalNet[String(x.trip_member_id)]:0})));
+    const myId=String(window.authState.member.id);
+    const myFund=fundRows.find(m=>String(m.id)===myId);
+    const myTransfers=transfers.filter(x=>x.from.id===myId||x.to.id===myId);
+    let html=`<div class="final-fund-card"><div class="final-fund-title"><span>🏦</span><div><b>بستن حساب صندوق</b><small>موجودی فعلی صندوق پس از هزینه‌های تأییدشده</small></div></div><strong>${money(fundBalance)}</strong>${surplus?`<p class="fund-final-credit">🟢 ${money(surplus)} برای بازگشت به اعضا باقی مانده است.</p>`:deficit?`<p class="fund-final-debt">🔴 صندوق ${money(deficit)} کسری دارد و باید از اعضای بدهکار تأمین شود.</p>`:`<p class="fund-final-settled">✅ موجودی صندوق دقیقاً تسویه شده است.</p>`}</div>`;
+    html+=`<div class="section-head"><h3>📋 وضعیت نهایی سهم اعضا از صندوق</h3></div>`;
+    html+=fundRows.map(m=>{const b=Number(m.finalFundBalance||0);const label=b>1?'طلب از صندوق':b<-1?'بدهی به صندوق':'تسویه';return `<div class="list-item"><b>${escapeHtml(m.name)}</b><span class="badge ${b>1?'approved':b<-1?'pending':'approved'}">${label}</span><p>واریزی تأییدشده: ${money(fundPaid[String(m.id)]||0)}</p><small>سهم هزینه‌های صندوق: ${money(fundExpenseShare[String(m.id)]||0)} • ${b>1?`قابل برگشت: ${money(b)}`:b<-1?`قابل وصول: ${money(-b)}`:'بدون مانده'}</small></div>`}).join('');
+    html+=`<div class="final-settlement-personal"><div class="section-head"><h3>🤝 تسویه بین اعضا</h3></div><p class="muted">فقط هزینه‌های تأییدشده‌ای که شخصاً توسط یک عضو پرداخت شده‌اند در این بخش محاسبه می‌شوند.</p>`;
+    if(myTransfers.length){ html+=`<div class="personal-final-highlight"><b>وضعیت شما</b>${myTransfers.map(x=>x.from.id===myId?`<div class="finance-msg debt"><span>👤</span><div><b>باید به ${escapeHtml(x.to.name)} پرداخت کنید</b><strong>${money(x.amount)} تومان</strong></div></div>`:`<div class="finance-msg credit"><span>👤</span><div><b>${escapeHtml(x.from.name)} باید به شما پرداخت کند</b><strong>${money(x.amount)} تومان</strong></div></div>`).join('')}</div>`; }
+    html+=transfers.length?transfers.map(x=>`<div class="list-item transfer-row"><b>💸 ${escapeHtml(x.from.name)} ← ${escapeHtml(x.to.name)}</b><strong>${money(x.amount)}</strong></div>`).join(''):'<div class="empty-state">بین اعضا بدهی یا طلبی برای تسویه نهایی وجود ندارد.</div>';
+    html+=`</div>`;
+    if(!transfers.length && !myTransfers.length && myFund) html+=`<div class="settlement-note">${myFund.finalFundBalance>1?'🟢 سهم شما از مانده صندوق قابل برگشت است.':myFund.finalFundBalance<-1?'🔴 شما در تسویه نهایی صندوق بدهکار هستید.':'✅ حساب شما در صندوق تسویه است.'}</div>`;
+    el.innerHTML=html;
+  }catch(e){console.error('final settlement',e);el.innerHTML=`<div class="empty-state">محاسبه تسویه نهایی انجام نشد.<br><small>${escapeHtml(e.message||'خطای نامشخص')}</small></div>`;}
+}
+
+// ===== PWA install + personal financial notice (v13.7) =====
 window.deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -435,27 +493,19 @@ window.renderPersonalFinancialNotice = async function(showPopup=false){
     if(!me) return;
     const fundTarget=Number(me.contribution_target||0), fundPaid=Number(me.approved_contributions||0);
     const fundDiff=fundPaid-fundTarget;
-    const expenseBalance=Number(me.direct_paid||0)-Number(me.calculated_share||0);
-    const transfers=buildSmartTransfers(members);
-    const mine=transfers.filter(t=>t.from.id===myId || t.to.id===myId);
     const rows=[];
-    if(fundDiff<0) rows.push(`<div class="finance-msg debt"><span>🏦</span><div><b>بدهی شما به صندوق</b><strong>${money(-fundDiff)} تومان</strong></div></div>`);
-    else if(fundDiff>0) rows.push(`<div class="finance-msg credit"><span>🏦</span><div><b>طلب شما از صندوق</b><strong>${money(fundDiff)} تومان</strong></div></div>`);
-    else rows.push(`<div class="finance-msg settled"><span>✅</span><div><b>حساب شما با صندوق تسویه است</b><small>تعهد صندوق کامل پرداخت شده است.</small></div></div>`);
-    if(mine.length){
-      mine.forEach(t=>{
-        if(t.from.id===myId) rows.push(`<div class="finance-msg debt"><span>👤</span><div><b>باید به ${escapeHtml(t.to.name)} پرداخت کنید</b><strong>${money(t.amount)} تومان</strong></div></div>`);
-        else rows.push(`<div class="finance-msg credit"><span>👤</span><div><b>${escapeHtml(t.from.name)} باید به شما پرداخت کند</b><strong>${money(t.amount)} تومان</strong></div></div>`);
-      });
-    } else if(Math.abs(expenseBalance)<1) rows.push(`<div class="finance-msg settled"><span>🤝</span><div><b>حساب هزینه‌های شخصی شما تسویه است</b><small>در حال حاضر بدهی یا طلبی از اعضا ندارید.</small></div></div>`);
-    const summary=`<div class="personal-finance-card"><div class="personal-finance-head"><div><small>وضعیت مالی من</small><h3>${escapeHtml(me.name||'عضو سفر')}</h3></div><span>💳</span></div>${rows.join('')}<button class="btn small" onclick="showPage('settlement')">مشاهده جزئیات تسویه</button></div>`;
+    if(fundDiff<0) rows.push(`<div class="finance-msg debt"><span>🏦</span><div><b>بدهی شما به صندوق</b><strong>${money(-fundDiff)} تومان</strong><small>مبلغ موردنیاز صندوق شما هنوز کامل پرداخت نشده است.</small></div></div>`);
+    else if(fundDiff>0) rows.push(`<div class="finance-msg credit"><span>🏦</span><div><b>طلب شما از صندوق</b><strong>${money(fundDiff)} تومان</strong><small>پرداخت شما بیشتر از تعهد فعلی صندوق است.</small></div></div>`);
+    else rows.push(`<div class="finance-msg settled"><span>✅</span><div><b>سهم شما از صندوق تسویه است</b><small>تعهد صندوق شما به‌طور کامل پرداخت شده است.</small></div></div>`);
+    rows.push(`<div class="finance-stage-note"><span>ℹ️</span><div><b>تسویه با اعضا در پایان سفر</b><small>در پایان سفر، اگر هزینه‌ای توسط اعضا شخصاً پرداخت شده باشد، بدهی یا طلب بین افراد در بخش «تسویه نهایی» محاسبه می‌شود.</small></div></div>`);
+    const summary=`<div class="personal-finance-card"><div class="personal-finance-head"><div><small>وضعیت مالی من</small><h3>${escapeHtml(me.name||'عضو سفر')}</h3></div><span>🏦</span></div>${rows.join('')}<button class="btn small" onclick="showPage('settlement')">💸 مشاهده تسویه نهایی</button></div>`;
     const target=document.querySelector('#personalFinanceNotice'); if(target) target.innerHTML=summary;
     if(showPopup){
       const key=`finance-notice:${window.authState.tripId}:${myId}`;
       if(!sessionStorage.getItem(key)){
         sessionStorage.setItem(key,'1');
         const m=document.querySelector('#modal');
-        if(m){m.innerHTML=`<div class="sheet finance-popup"><button class="close" onclick="closeModal()">×</button><div class="finance-popup-icon">💰</div><h2>وضعیت مالی شما</h2><p class="muted">خلاصه بدهی و طلب شما در این سفر</p>${rows.join('')}<button class="btn" onclick="closeModal();showPage('settlement')">جزئیات تسویه</button></div>`;m.classList.remove('hidden');}
+        if(m){m.innerHTML=`<div class="sheet finance-popup"><button class="close" onclick="closeModal()">×</button><div class="finance-popup-icon">🏦</div><h2>وضعیت صندوق شما</h2><p class="muted">وضعیت پرداخت سهم شما در این مرحله از سفر</p>${rows.join('')}<button class="btn" onclick="closeModal();showPage('settlement')">💸 تسویه نهایی سفر</button></div>`;m.classList.remove('hidden');}
       }
     }
   }catch(e){console.error('personal finance notice',e)}
