@@ -1,4 +1,4 @@
-const CACHE='trip-pwa-v14-6';
+const CACHE='trip-pwa-v15-1';
 const ASSETS=['./','./index.html','./styles.css?v=15.0','./supabase-config.js?v=15.0','./auth.js?v=15.0','./app.js?v=15.0','./manifest.webmanifest','./assets/north-login-bg.png','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
