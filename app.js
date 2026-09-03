@@ -1,4 +1,4 @@
-const APP_VERSION = "14.5"
+const APP_VERSION = "14.7"
 const state={role:'admin',user:'قاسم',trip:'سفر شمال ۱۴۰۵',pendingMembers:[],members:[],expenses:[],locations:[],itinerary:[],shareAmount:12000000,settlementEnabled:false};
 const $=s=>document.querySelector(s); let modal=()=>document.querySelector('#modal');
 
@@ -82,7 +82,7 @@ window.showPage=async function showPage(page){let title='',body='';
  } else if(page==='members'){await loadTripSettings();await loadTripMembers();const fin=await loadFinancialSummary();const fm=Object.fromEntries((fin?.members||[]).map(x=>[String(x.trip_member_id),x]));const pendingReqs=window.authState?.member?.role==='admin'?await loadMembershipRequests():[];title='👥 اعضای سفر';body=`<div class="stat primary"><span>💰 مبلغ هر سهم</span><strong>${money(state.shareAmount)}</strong><small>تعهد صندوق هر عضو بر اساس ضریب ثابت سفر محاسبه می‌شود</small></div>${window.authState?.member?.role==='admin'?`<button class="btn" onclick="editShareAmount()">✏️ تغییر مبلغ هر سهم</button><button class="btn ${state.settlementEnabled?'secondary':'success'}" onclick="toggleFinalSettlement()">${state.settlementEnabled?'🔒 غیرفعال کردن تسویه نهایی':'🔓 فعال کردن تسویه نهایی'}</button><button class="btn secondary" onclick="copyInvite()">🔗 ساخت و کپی لینک دعوت</button><div class="list-item"><b>📨 درخواست‌های عضویت</b><p class="muted">هر کسی با لینک دعوت حساب بسازد، تا تأیید مدیر عضو فعال نمی‌شود.</p>${pendingReqs.length?pendingReqs.map(r=>`<div class="membership-request"><b>${escapeHtml(r.full_name)}</b><small>${escapeHtml(r.phone||'شماره ثبت نشده')} • ${new Date(r.requested_at).toLocaleString('fa-IR')}</small>${r.note?`<p>${escapeHtml(r.note)}</p>`:''}<div class="actions"><button class="btn small" onclick="approveMember('${r.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectMember('${r.id}')">× رد</button></div></div>`).join(''):'<p class="muted">درخواست جدیدی وجود ندارد.</p>'}</div>`:''}<button type="button" class="btn" data-action="add-member">➕ ساخت حساب و افزودن عضو</button><p class="muted">بدهی یا طلب صندوق بر اساس واریزی‌های تأییدشده محاسبه می‌شود.</p>${state.members.map(m=>{const f=fm[String(m.id)]||{};const target=Number(m.contribution_target||f.contribution_target||0);const paid=Number(f.approved_contributions||0);const diff=paid-target;const balanceHtml=diff<0?`<span class="fund-debt">🔴 بدهی به صندوق: ${money(-diff)}</span>`:diff>0?`<span class="fund-credit">🟢 طلب از صندوق: ${money(diff)}</span>`:`<span class="fund-settled">⚪ تسویه شده</span>`;return `<div class="list-item member-item"><div class="member-head"><div class="mini-avatar">${m.avatar_url?`<img src="${escapeAttr(m.avatar_url)}" alt="">`:(escapeHtml((m.name||'ع').slice(0,1)))}</div><b>${escapeHtml(m.name)}</b></div><div class="member-finance"><div><small>تعهد صندوق</small><strong>${money(target)}</strong></div><div>${balanceHtml}</div></div><small>${m.role==='admin'?'👑 مدیر سفر':'👤 عضو'}</small>${window.authState?.member?.role==='admin'?`<div class="actions"><button class="btn small" onclick="editMember('${m.id}')">✏️ ویرایش پروفایل</button>${m.user_id!==window.authState?.session?.user?.id?`<button class="btn danger small" onclick="deleteMember('${m.id}','${escapeAttr(m.name)}')">🗑️ حذف</button>`:''}</div>`:''}</div>`}).join('')||'<p class="muted">عضوی وجود ندارد.</p>'}`;
  } else if(page==='locations'){await loadLocations();title='📍 مکان‌های دیدنی';body=`<button class="btn" data-action="add-location">➕ پیشنهاد مکان جدید</button><p class="muted">هر عضو می‌تواند مکان پیشنهاد کند؛ مکان پیشنهادی پس از تأیید مدیر برای همه قابل استفاده است.</p>${state.locations.map(l=>{const st=l.status||'pending';const cls=st==='approved'?'approved':st==='rejected'?'danger':'pending';const actions=window.authState?.member?.role==='admin'&&st==='pending'?`<div class="actions"><button class="btn small" onclick="approveLocation('${l.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectLocation('${l.id}')">× رد</button></div>`:'';return `<div class="list-item"><span class="badge ${cls}">${statusFa(st)}</span><b>📍 ${escapeHtml(l.name)}</b>${l.category?`<p>دسته‌بندی: ${escapeHtml(l.category)}</p>`:''}${l.description?`<p>${escapeHtml(l.description)}</p>`:''}${l.suggested_duration_minutes?`<small>⏱️ حدود ${l.suggested_duration_minutes} دقیقه</small>`:''}${l.map_url?`<p><a href="${escapeAttr(l.map_url)}" target="_blank" rel="noopener">🗺️ مشاهده روی نقشه</a></p>`:''}${actions}</div>`}).join('')||'<div class="empty-state">هنوز مکانی پیشنهاد نشده است.</div>'}`;
  } else if(page==='itinerary'){await loadItinerary();title='🗺️ برنامه سفر';body=`<button class="btn" onclick="addItineraryProposal()">➕ پیشنهاد برنامه جدید</button><p class="muted">همه اعضای سفر می‌توانند برنامه پیشنهاد دهند؛ برنامه پس از تأیید مدیر برای همه قطعی می‌شود.</p>${state.itinerary.map(x=>{const st=x.status||'pending';const cls=st==='approved'?'approved':st==='rejected'?'danger':'pending';const actions=window.authState?.member?.role==='admin'&&st==='pending'?`<div class="actions"><button class="btn small" onclick="approveItinerary('${x.id}')">✓ تأیید</button><button class="btn danger small" onclick="rejectItinerary('${x.id}')">× رد</button></div>`:'';const tm=[x.start_time,x.end_time].filter(Boolean).join(' تا ');return `<div class="list-item"><span class="badge ${cls}">${statusFa(st)}</span><b>${escapeHtml(x.title)}</b><p>📅 ${escapeHtml(x.item_date||'')}${tm?' • ⏰ '+escapeHtml(tm):''}</p>${x.description?`<p>${escapeHtml(x.description)}</p>`:''}${x.location?.name?`<small>📍 ${escapeHtml(x.location.name)}</small>`:''}${actions}</div>`}).join('')||'<div class="empty-state">هنوز برنامه‌ای ثبت نشده است.</div>'}`;
- } else if(page==='checklist'){title='🎒 چک‌لیست سفر';body=`<div class="checklist-intro"><b>چک‌لیست مشترک سفر</b><p class="muted">همه اعضای فعال می‌توانند وسیله‌ای اضافه کنند یا وضعیت آن را علامت بزنند. نام ثبت‌کننده کنار هر مورد نمایش داده می‌شود.</p></div><div class="checklist-add"><input id="checkItemInput" placeholder="مثلاً قهوه‌ساز مسافرتی" maxlength="200"><button class="btn" onclick="addChecklistItem()">➕ افزودن</button></div><div id="checklistList"><div class="empty-state">در حال بارگذاری...</div></div>`;setTimeout(loadChecklist,0);
+ } else if(page==='checklist'){title='🎒 چک‌لیست سفر';body=`<div class="checklist-intro"><b>چک‌لیست مشترک سفر</b><p class="muted">همه اعضای فعال می‌توانند وسیله‌ای اضافه کنند، مسئولیت آوردن آن را قبول کنند و وضعیت آن را علامت بزنند. نام ثبت‌کننده و مسئول هر مورد مشخص است تا چیزی فراموش نشود.</p></div><div class="checklist-add"><input id="checkItemInput" placeholder="مثلاً قهوه‌ساز مسافرتی" maxlength="200"><button class="btn" onclick="addChecklistItem()">➕ افزودن</button></div><div id="checklistList"><div class="empty-state">در حال بارگذاری...</div></div>`;setTimeout(loadChecklist,0);
  } else if(page==='notifications'){title='🔔 اعلان‌ها';body=`<div class="list-item"><b>مرکز اعلان‌ها</b><p class="muted">درخواست‌های جدید سفر در این بخش نمایش داده می‌شوند.</p></div><div id="notificationsList"><div class="empty-state">در حال بررسی درخواست‌ها...</div></div>`;setTimeout(loadNotificationsPage,0);
  } else if(page==='settlement'){await loadTripSettings(); title='💸 تسویه نهایی سفر'; if(!state.settlementEnabled){body=`<div class="settlement-locked"><div class="settlement-lock-icon">🔒</div><h2>تسویه نهایی هنوز فعال نشده است</h2><p>این بخش فقط در پایان سفر و با فعال‌سازی مدیر قابل استفاده است.</p><strong>بدستور مدیر سفر، تسویه اعضا فعلاً غیرفعال است.</strong><small>لطفاً پس از اعلام مدیر دوباره به این بخش مراجعه کنید.</small><button class="btn" onclick="showPage('home')">🏠 بازگشت به صفحه اصلی</button></div>`;}else{body=`<div class="settlement-intro"><b>این بخش برای پایان سفر است</b><p>در پایان سفر، مانده صندوق و تسویه بین اعضا در اینجا محاسبه می‌شود.</p></div><div id="finalSettlement"><div class="empty-state">در حال محاسبه تسویه نهایی...</div></div>`;setTimeout(renderFinalSettlement,0);}
  } else if(page==='album'){title='📷 آلبوم سفر';body=`<div class="album-toolbar"><p class="muted">اعضای فعال سفر می‌توانند عکس اضافه کنند، لایک کنند و نظر بگذارند.</p><button class="btn" onclick="uploadPhoto()">📤 آپلود عکس</button></div><div id="albumGrid" class="album-grid"><div class="empty-state">در حال بارگذاری آلبوم...</div></div>`; setTimeout(loadAlbum,0);
@@ -324,7 +324,7 @@ window.uploadPhoto=async()=>{
   if(up){alert('آپلود عکس انجام نشد: '+up.message);return;}
   const {error}=await window.sb.from('album_photos').insert({trip_id:window.authState.tripId,uploaded_by:window.authState.session.user.id,storage_path:path,caption:''});
   if(error){await window.sb.storage.from('trip-photos').remove([path]);alert('ثبت عکس انجام نشد: '+error.message);return;}
-  loadAlbum(); loadHomeAlbum();
+  loadAlbum(); loadHomeAlbum(); loadHomeChecklist();
  };
  input.click();
 };
@@ -335,14 +335,14 @@ window.togglePhotoLike=async(photoId)=>{
  if(readErr){alert(readErr.message);return;}
  if(existing){const {error}=await window.sb.from('photo_likes').delete().eq('id',existing.id);if(error){alert(error.message);return;}}
  else{const {error}=await window.sb.from('photo_likes').insert({photo_id:photoId,user_id:uid});if(error){alert(error.message);return;}}
- loadAlbum(); loadHomeAlbum();
+ loadAlbum(); loadHomeAlbum(); loadHomeChecklist();
 };
 window.addPhotoComment=async(photoId)=>{
  if(!window.authState?.session){showAuth();return;}
  const text=prompt('نظر شما:'); if(!text?.trim())return;
  const clean=text.trim().slice(0,1000);
  const {error}=await window.sb.from('photo_comments').insert({photo_id:photoId,user_id:window.authState.session.user.id,comment:clean});
- if(error){alert(error.message);return;} loadAlbum(); loadHomeAlbum();
+ if(error){alert(error.message);return;} loadAlbum(); loadHomeAlbum(); loadHomeChecklist();
 };
 async function fetchAlbumData(limit=6){
  if(!window.authState?.tripId)return {photos:[],likes:[],comments:[],profiles:[]};
@@ -375,6 +375,21 @@ function renderPhotoCards(list,likeRows,commentRows,profileRows,compact=false){
   return `<article class="photo-card ${compact?'compact':''}"><img src="${escapeAttr(photoUrl(ph))}" loading="lazy" alt="عکس سفر" onclick="openPhoto('${ph.id}')"><div class="photo-meta"><b>${escapeHtml(profileMap[ph.uploaded_by]||'عضو سفر')}</b><div class="photo-actions"><button class="icon-btn ${liked?'liked':''}" onclick="togglePhotoLike('${ph.id}')">♥ ${phLikes.length}</button><button class="icon-btn" onclick="addPhotoComment('${ph.id}')">💬 ${allComments.length}</button></div></div>${ph.caption?`<p>${escapeHtml(ph.caption)}</p>`:''}<div class="comments">${phComments.map(c=>{const cp=(profileRows||[]).find(x=>x.user_id===c.user_id);return `<div class="comment-row"><div class="comment-avatar">${cp?.avatar_url?`<img src="${escapeAttr(cp.avatar_url)}" alt="">`:escapeHtml((cp?.display_name||'ع').slice(0,1))}</div><div><b>${escapeHtml(cp?.display_name||'عضو سفر')}</b><small>${new Date(c.created_at).toLocaleString('fa-IR')}</small><p>${escapeHtml(c.comment)}</p></div></div>`}).join('')}</div></article>`;
  }).join('');
 }
+window.loadHomeChecklist=async()=>{
+ const el=document.querySelector('#homeChecklistList'); if(!el||!window.authState?.tripId)return;
+ const {data,error}=await window.sb.from('trip_checklist_items').select('id,item,added_by,is_done,completed_by,responsible_user_id,created_at').eq('trip_id',window.authState.tripId).order('created_at',{ascending:false}).limit(6);
+ if(error){el.innerHTML='<div class="empty-state">چک‌لیست هنوز آماده نیست.</div>';return;}
+ const ids=[...new Set((data||[]).flatMap(x=>[x.added_by,x.completed_by,x.responsible_user_id]).filter(Boolean))]; let names={};
+ if(ids.length){const {data:ms}=await window.sb.from('trip_members').select('user_id,name').eq('trip_id',window.authState.tripId).in('user_id',ids); names=Object.fromEntries((ms||[]).map(x=>[x.user_id,x.name]));}
+ const uid=window.authState.session.user.id;
+ el.innerHTML=(data||[]).map(x=>{
+   const responsible=x.responsible_user_id; const mine=responsible===uid;
+   const claimHtml=responsible
+     ? `<small class="responsible-line ${mine?'mine':''}">👤 مسئول آوردن: <strong>${escapeHtml(names[responsible]||'عضو سفر')}</strong></small><button class="btn tiny secondary" onclick="releaseChecklistItem('${x.id}')">${mine?'لغو مسئولیت':'مسئول انتخاب شده'}</button>`
+     : `<small class="responsible-line unclaimed">⚠️ هنوز کسی مسئول آوردن نیست</small><button class="btn tiny" onclick="claimChecklistItem('${x.id}')">🙋 من می‌آورم</button>`;
+   return `<div class="home-check-row ${x.is_done?'done':''}"><input type="checkbox" ${x.is_done?'checked':''} onchange="toggleChecklistItem('${x.id}',this.checked)"><div><b>${escapeHtml(x.item)}</b><small>➕ ثبت توسط ${escapeHtml(names[x.added_by]||'عضو سفر')}</small><div class="home-check-responsibility">${claimHtml}</div></div></div>`;
+ }).join('')||'<div class="empty-state">هنوز موردی اضافه نشده است.</div>';
+};
 window.loadHomeAlbum=async()=>{
  const grid=document.querySelector('#homeAlbumGrid');if(!grid)return;
  if(!window.authState?.session||!window.authState?.tripId){grid.innerHTML='<div class="empty-state">برای دیدن آلبوم وارد حساب شوید و عضو سفر باشید.</div>';return;}
@@ -391,13 +406,30 @@ window.loadAlbum=async()=>{
 };
 async function loadChecklist(){
  const el=document.querySelector('#checklistList'); if(!el||!window.authState?.tripId)return;
- const {data,error}=await window.sb.from('trip_checklist_items').select('id,item,added_by,is_done,completed_by,completed_at,created_at').eq('trip_id',window.authState.tripId).order('created_at',{ascending:false});
+ const {data,error}=await window.sb.from('trip_checklist_items').select('id,item,added_by,is_done,completed_by,completed_at,responsible_user_id,created_at').eq('trip_id',window.authState.tripId).order('created_at',{ascending:false});
  if(error){el.innerHTML=`<div class="empty-state">چک‌لیست هنوز آماده نیست.<br><small>${escapeHtml(error.message)}</small></div>`;return;}
- const ids=[...new Set((data||[]).map(x=>x.added_by).filter(Boolean).concat((data||[]).map(x=>x.completed_by).filter(Boolean)))];
+ const ids=[...new Set((data||[]).flatMap(x=>[x.added_by,x.completed_by,x.responsible_user_id]).filter(Boolean))];
  let names={};
  if(ids.length){const {data:ms}=await window.sb.from('trip_members').select('user_id,name').eq('trip_id',window.authState.tripId).in('user_id',ids); names=Object.fromEntries((ms||[]).map(x=>[x.user_id,x.name]));}
- el.innerHTML=(data||[]).map(x=>`<div class="list-item checklist-item ${x.is_done?'done':''}"><div class="check-row"><label><input type="checkbox" ${x.is_done?'checked':''} onchange="toggleChecklistItem('${x.id}',this.checked)"><span class="checkmark">${x.is_done?'✓':'○'}</span></label><div class="check-content"><b>${escapeHtml(x.item)}</b><small>➕ ثبت توسط <strong>${escapeHtml(names[x.added_by]||'عضو سفر')}</strong> • ${new Date(x.created_at).toLocaleString('fa-IR')}</small>${x.is_done?`<small class="done-by">✅ انجام شد توسط <strong>${escapeHtml(names[x.completed_by]||'عضو سفر')}</strong></small>`:''}</div><button class="icon-btn" onclick="deleteChecklistItem('${x.id}')">🗑️</button></div></div>`).join('')||'<div class="empty-state">هنوز چیزی به چک‌لیست اضافه نشده است.</div>';
+ const uid=window.authState.session.user.id;
+ el.innerHTML=(data||[]).map(x=>{
+   const responsible=x.responsible_user_id; const mine=responsible===uid;
+   const responsibility=responsible
+     ? `<div class="responsibility-box ${mine?'mine':''}"><span>👤 مسئول آوردن: <strong>${escapeHtml(names[responsible]||'عضو سفر')}</strong></span>${mine?`<button class="btn tiny secondary" onclick="releaseChecklistItem('${x.id}')">لغو مسئولیت</button>`:''}</div>`
+     : `<div class="responsibility-box unclaimed"><span>⚠️ هنوز کسی مسئول آوردن این مورد نشده است.</span><button class="btn tiny" onclick="claimChecklistItem('${x.id}')">🙋 من می‌آورم</button></div>`;
+   return `<div class="list-item checklist-item ${x.is_done?'done':''}"><div class="check-row"><label><input type="checkbox" ${x.is_done?'checked':''} onchange="toggleChecklistItem('${x.id}',this.checked)"><span class="checkmark">${x.is_done?'✓':'○'}</span></label><div class="check-content"><b>${escapeHtml(x.item)}</b><small>➕ ثبت توسط <strong>${escapeHtml(names[x.added_by]||'عضو سفر')}</strong> • ${new Date(x.created_at).toLocaleString('fa-IR')}</small>${responsibility}${x.is_done?`<small class="done-by">✅ آورده/انجام شد توسط <strong>${escapeHtml(names[x.completed_by]||'عضو سفر')}</strong></small>`:''}</div><button class="icon-btn" onclick="deleteChecklistItem('${x.id}')">🗑️</button></div></div>`;
+ }).join('')||'<div class="empty-state">هنوز چیزی به چک‌لیست اضافه نشده است.</div>';
 }
+window.claimChecklistItem=async(id)=>{
+ const {error}=await window.sb.rpc('claim_checklist_item',{p_item_id:id});
+ if(error){alert(error.message.includes('already')?'این مورد را شخص دیگری انتخاب کرده است. لطفاً لیست را تازه کنید.':'قبول مسئولیت انجام نشد:\n'+error.message);return;}
+ await loadChecklist(); await loadHomeChecklist();
+};
+window.releaseChecklistItem=async(id)=>{
+ const {error}=await window.sb.rpc('release_checklist_item',{p_item_id:id});
+ if(error){alert('لغو مسئولیت انجام نشد:\n'+error.message);return;}
+ await loadChecklist(); await loadHomeChecklist();
+};
 window.addChecklistItem=async()=>{
  const input=document.querySelector('#checkItemInput'); const item=input?.value.trim();
  if(!item)return alert('لطفاً نام وسیله یا مورد موردنظر را وارد کنید.');
@@ -408,9 +440,9 @@ window.addChecklistItem=async()=>{
 window.toggleChecklistItem=async(id,done)=>{
  const patch={is_done:!!done,completed_by:done?window.authState.session.user.id:null,completed_at:done?new Date().toISOString():null};
  const {error}=await window.sb.from('trip_checklist_items').update(patch).eq('id',id);
- if(error){alert('تغییر وضعیت انجام نشد:\n'+error.message);await loadChecklist();return;} await loadChecklist();
+ if(error){alert('تغییر وضعیت انجام نشد:\n'+error.message);await loadChecklist();return;} await loadChecklist(); await loadHomeChecklist();
 };
-window.deleteChecklistItem=async(id)=>{if(!confirm('این مورد از چک‌لیست حذف شود؟'))return;const {error}=await window.sb.from('trip_checklist_items').delete().eq('id',id);if(error){alert('حذف انجام نشد:\n'+error.message);return;}await loadChecklist();};
+window.deleteChecklistItem=async(id)=>{if(!confirm('این مورد از چک‌لیست حذف شود؟'))return;const {error}=await window.sb.from('trip_checklist_items').delete().eq('id',id);if(error){alert('حذف انجام نشد:\n'+error.message);return;}await loadChecklist(); await loadHomeChecklist();};
 async function loadNotificationsPage(){
  const el=document.querySelector('#notificationsList'); if(!el||!window.authState?.tripId)return;
  const isAdmin=window.authState?.member?.role==='admin';
@@ -440,7 +472,7 @@ document.addEventListener('click',e=>{
  if(action==='save-location'){e.preventDefault();window.saveLocation?.();return;}
  const b=e.target.closest('[data-page]');if(b){e.preventDefault();showPage(b.dataset.page);return;}
  if(e.target===modal())closeModal();
-});renderPending();setTimeout(loadExpenses,500);setTimeout(loadHomeAlbum,800);
+});renderPending();setTimeout(loadExpenses,500);setTimeout(loadHomeAlbum,800);setTimeout(loadHomeChecklist,900);
 
 
 
