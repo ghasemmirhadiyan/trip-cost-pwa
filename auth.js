@@ -3,6 +3,40 @@ const sb = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonK
 window.sb = sb;
 
 const authState = { session: null, profile: null, tripId: null, trip: null, member: null };
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 دقیقه عدم فعالیت
+const INACTIVITY_KEY = 'trip_last_activity_at';
+let inactivityTimer = null;
+let inactivityInitialized = false;
+function markUserActivity(){
+  if(!authState.session) return;
+  localStorage.setItem(INACTIVITY_KEY, String(Date.now()));
+  scheduleInactivityLogout();
+}
+function scheduleInactivityLogout(){
+  if(inactivityTimer) clearTimeout(inactivityTimer);
+  if(!authState.session) return;
+  const last=Number(localStorage.getItem(INACTIVITY_KEY)||Date.now());
+  const remaining=INACTIVITY_TIMEOUT_MS-(Date.now()-last);
+  if(remaining<=0){ forceInactivityLogout(); return; }
+  inactivityTimer=setTimeout(forceInactivityLogout, remaining+250);
+}
+async function forceInactivityLogout(){
+  if(!authState.session) return;
+  if(inactivityTimer){clearTimeout(inactivityTimer); inactivityTimer=null;}
+  localStorage.removeItem(INACTIVITY_KEY);
+  try{ await sb.auth.signOut({scope:'local'}); }catch(e){ console.warn('inactivity signOut',e); }
+  authState.session=null; authState.profile=null; authState.tripId=null; authState.trip=null; authState.member=null;
+  document.body.classList.add('unauthenticated');
+  window.showAuth?.(true);
+  const msg=document.querySelector('#authMsg');
+  if(msg) msg.textContent='به‌دلیل عدم فعالیت، برای امنیت دوباره وارد حساب شوید.';
+}
+function initInactivityTracking(){
+  if(inactivityInitialized) return;
+  inactivityInitialized=true;
+  ['click','keydown','touchstart','pointerdown','scroll'].forEach(ev=>window.addEventListener(ev, markUserActivity, {passive:true}));
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') scheduleInactivityLogout(); });
+}
 const SINGLE_TRIP_MODE = true;
 const savedJoinToken = () => localStorage.getItem('trip_join_token');
 function rememberJoinToken(){ const t=new URLSearchParams(location.search).get('join'); if(t) localStorage.setItem('trip_join_token',t); }
@@ -11,9 +45,26 @@ const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt
 rememberJoinToken();
 async function bootAuth(){
   if(window.SUPABASE_CONFIG.url.includes('YOUR_PROJECT')) return false;
+  initInactivityTracking();
   const {data:{session}} = await sb.auth.getSession();
   authState.session=session;
-  sb.auth.onAuthStateChange((_e,s)=>{authState.session=s; if(window.refreshAppAuth) window.refreshAppAuth();});
+  if(session){
+    const last=Number(localStorage.getItem(INACTIVITY_KEY)||0);
+    if(last && Date.now()-last>=INACTIVITY_TIMEOUT_MS){ await forceInactivityLogout(); return true; }
+    localStorage.setItem(INACTIVITY_KEY, String(Date.now()));
+    scheduleInactivityLogout();
+  }
+  sb.auth.onAuthStateChange((event,s)=>{
+    authState.session=s;
+    if(s){
+      localStorage.setItem(INACTIVITY_KEY, String(Date.now()));
+      scheduleInactivityLogout();
+    } else {
+      if(inactivityTimer) clearTimeout(inactivityTimer);
+      localStorage.removeItem(INACTIVITY_KEY);
+    }
+    if(window.refreshAppAuth) window.refreshAppAuth();
+  });
   if(session) await loadIdentity();
   return true;
 }
@@ -123,7 +174,7 @@ window.signupUser=async()=>{
   msg.textContent=data.session?'✅ ثبت‌نام با موفقیت انجام شد.':'✅ حساب ایجاد شد. ایمیل خود را برای فعال‌سازی تأیید کنید.';
  }catch(e){msg.textContent=authErrorText(e,'ثبت‌نام');msg.classList.add('error');}
 };
-window.logoutUser=async()=>{await sb.auth.signOut();location.reload();};
+window.logoutUser=async()=>{localStorage.removeItem(INACTIVITY_KEY);await sb.auth.signOut({scope:'local'});location.reload();};
 
 async function showJoinFlow(token){
   const {data:rows,error}=await sb.rpc('lookup_active_invite',{p_token:token});
