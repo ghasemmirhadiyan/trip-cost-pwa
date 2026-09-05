@@ -1,4 +1,4 @@
-const APP_VERSION = "15.6"
+const APP_VERSION = "15.7"
 const state={role:'admin',user:'قاسم',trip:'مدیریت سفر گروهی',pendingMembers:[],members:[],expenses:[],locations:[],itinerary:[],shareAmount:12000000,settlementEnabled:false};
 const $=s=>document.querySelector(s); let modal=()=>document.querySelector('#modal');
 

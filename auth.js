@@ -152,7 +152,7 @@ window.loginUser=async()=>{
   if(!loginEmail){msg.textContent='نام کاربری پیدا نشد.';msg.classList.add('error');return;}
   const {error}=await sb.auth.signInWithPassword({email:loginEmail,password});
   if(error){msg.textContent=authErrorText(error,'ورود');msg.classList.add('error');return;}
-  msg.textContent='ورود موفق بود.'; await loadIdentity(); closeModal(); window.refreshAppAuth?.();
+  msg.textContent='ورود موفق بود.'; await loadIdentity(); closeModal(); window.refreshAppAuth?.(); setTimeout(()=>window.showMemberAnnouncement?.(),650);
  }catch(e){msg.textContent=authErrorText(e,'ورود');msg.classList.add('error');}
 };
 window.signupUser=async()=>{

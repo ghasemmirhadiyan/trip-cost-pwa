@@ -23,7 +23,7 @@
 - خروج خودکار فقط همان نشست دستگاه/مرورگر را خارج می‌کند (`scope: local`).
 
 
-## v15.6
+## v15.7
 - Admin can delete expenses via secure RPC.
 - Active admin announcement is shown to all logged-in users, including admins, on refresh/login.
-- Cache/version bumped to 15.6.
+- Cache/version bumped to 15.7.
