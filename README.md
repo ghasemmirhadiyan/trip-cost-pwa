@@ -21,3 +21,9 @@
 - اگر کاربر ۳۰ دقیقه هیچ فعالیتی نداشته باشد، نشست محلی او خاتمه یافته و صفحه ورود دوباره نمایش داده می‌شود.
 - اگر برنامه پس از مدت طولانی عدم فعالیت دوباره باز شود، آخرین زمان فعالیت بررسی می‌شود و در صورت عبور از ۳۰ دقیقه، ورود مجدد الزامی خواهد بود.
 - خروج خودکار فقط همان نشست دستگاه/مرورگر را خارج می‌کند (`scope: local`).
+
+
+## v15.6
+- Admin can delete expenses via secure RPC.
+- Active admin announcement is shown to all logged-in users, including admins, on refresh/login.
+- Cache/version bumped to 15.6.
